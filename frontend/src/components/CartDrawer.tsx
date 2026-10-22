@@ -471,7 +471,29 @@ export function CartDrawer({
               </p>
             </div>
 
+            {/* Sin cuenta no se puede tramitar: se avisa y se ofrece el acceso */}
+            {!isAuthenticated && (
+              <p
+                className="mt-3 flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] leading-snug text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300"
+                id="cart-auth-required"
+              >
+                <span className="material-symbols-outlined mt-px text-[13px]">lock</span>
+                <span>
+                  Necesitas una cuenta para tramitar el pedido.{" "}
+                  <button
+                    className="font-extrabold underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-200"
+                    onClick={onOpenAuth}
+                    type="button"
+                  >
+                    Inicia sesión o regístrate
+                  </button>
+                  .
+                </span>
+              </p>
+            )}
+
             <button
+              aria-describedby={!isAuthenticated ? "cart-auth-required" : undefined}
               className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-bold text-white shadow-lg shadow-primary/25 transition-all hover:-translate-y-px hover:bg-[#F04A10] hover:shadow-xl hover:shadow-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/40"
               onClick={() => onCheckout(total)}
               type="button"

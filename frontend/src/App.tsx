@@ -52,6 +52,8 @@ export default function App() {
   // Panel de acceso: abierto o cerrado y con qué pestaña se muestra.
   const [authOpen, setAuthOpen] = useState(false);
   const [authTab, setAuthTab] = useState<AuthTab>("login");
+  // Si se intenta tramitar sin sesión, tras entrar se vuelve a abrir la cesta.
+  const [resumeCartAfterAuth, setResumeCartAfterAuth] = useState(false);
   // Aviso de bienvenida tras iniciar sesión o registrarse (abajo a la derecha).
   const [toast, setToast] = useState<ToastData | null>(null);
   const closeToast = useCallback(() => setToast(null), []);
@@ -192,7 +194,14 @@ export default function App() {
   };
 
   // No hay pasarela de pago: el pedido se simula y se avisa.
+  // Sin sesión no se puede tramitar: se pide acceso primero.
   const handleCheckout = (total: number) => {
+    if (!token) {
+      setResumeCartAfterAuth(true);
+      openAuth("login");
+      return;
+    }
+
     setCartOpen(false);
     setToast({
       id: Date.now(),
@@ -233,6 +242,10 @@ export default function App() {
   const handleLogin = async (email: string, password: string, remember: boolean) => {
     const account = await login(email, password, remember);
     setAuthOpen(false);
+    if (resumeCartAfterAuth) {
+      setResumeCartAfterAuth(false);
+      setCartOpen(true);
+    }
     setToast({
       id: Date.now(),
       title: "Sesión iniciada correctamente",
@@ -243,6 +256,10 @@ export default function App() {
   const handleRegister = async (name: string, email: string, password: string) => {
     const account = await register(name, email, password);
     setAuthOpen(false);
+    if (resumeCartAfterAuth) {
+      setResumeCartAfterAuth(false);
+      setCartOpen(true);
+    }
     setToast({
       id: Date.now(),
       title: "¡Registro completado!",
@@ -300,7 +317,10 @@ export default function App() {
         onCheckout={handleCheckout}
         onClose={closeCart}
         onGoShopping={handleGoShopping}
-        onOpenAuth={() => openAuth("login")}
+        onOpenAuth={() => {
+          setResumeCartAfterAuth(true);
+          openAuth("login");
+        }}
         onQuantityChange={handleChangeQuantity}
         onRemove={handleRemoveFromCart}
         onRetry={() => void loadCart()}
@@ -311,7 +331,10 @@ export default function App() {
       <AuthModal
         open={authOpen}
         initialTab={authTab}
-        onClose={() => setAuthOpen(false)}
+        onClose={() => {
+          setAuthOpen(false);
+          setResumeCartAfterAuth(false);
+        }}
         onLogin={handleLogin}
         onRegister={handleRegister}
       />

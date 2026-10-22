@@ -229,8 +229,12 @@ cualquier otra excepción cae en el manejador global y responde `500` en JSON
   esté en la cesta y el resumen con subtotal, descuento Club del 10 % (`CLUB10`,
   solo con sesión), envío y total con IVA. El stepper y la papelera escriben en MySQL
   al momento (`PATCH` y `DELETE` con talla y color); el corazón usa `favorites`.
-  «Tramitar Pedido» y «Ver Cesta Detallada» son acciones de demostración (muestran un
-  aviso, porque no hay pasarela de pago). El estado vacío invita a explorar el catálogo.
+  «Tramitar Pedido» exige sesión: si el usuario no ha entrado, el botón abre
+  `AuthModal` en la pestaña de acceso (el panel muestra además un aviso con candado
+  «Necesitas una cuenta para tramitar el pedido»), y al iniciar sesión o registrarse
+  la cesta se reabre automáticamente. Con sesión, el pedido es una demostración
+  (muestra un aviso, porque no hay pasarela de pago). «Ver Cesta Detallada» también
+  es una acción de demostración. El estado vacío invita a explorar el catálogo.
   En móvil ocupa toda la pantalla y, con el panel abierto, `Esc` o un clic en el fondo
   lo cierran.
 - **Cuenta**: la cabecera muestra **«Entrar»** y **«Registro»**. Ambos abren
