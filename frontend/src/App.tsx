@@ -1,6 +1,6 @@
 // App
 // Composición de la página NEXFIT: anuncio, cabecera, secciones y pie.
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   addCartItem,
   addFavorite,
@@ -22,6 +22,7 @@ import { PillarsSection } from "./components/PillarsSection";
 import { SearchOverlay } from "./components/SearchOverlay";
 import { SupportBanner } from "./components/SupportBanner";
 import { TechBanner } from "./components/TechBanner";
+import { Toast, type ToastData } from "./components/Toast";
 import { TrustBar } from "./components/TrustBar";
 import { useAuth } from "./hooks/useAuth";
 import { useTheme } from "./hooks/useTheme";
@@ -39,6 +40,9 @@ export default function App() {
   // Panel de acceso: abierto o cerrado y con qué pestaña se muestra.
   const [authOpen, setAuthOpen] = useState(false);
   const [authTab, setAuthTab] = useState<AuthTab>("login");
+  // Aviso de bienvenida tras iniciar sesión o registrarse (abajo a la derecha).
+  const [toast, setToast] = useState<ToastData | null>(null);
+  const closeToast = useCallback(() => setToast(null), []);
 
   // Atajo global ⌘K / Ctrl+K para abrir y cerrar el buscador.
   useEffect(() => {
@@ -127,15 +131,25 @@ export default function App() {
     setAuthOpen(true);
   }
 
-  // Tras un acceso correcto el panel se cierra: la cabecera ya muestra la cuenta.
+  // Tras un acceso correcto el panel se cierra y se confirma con un aviso.
   const handleLogin = async (email: string, password: string) => {
-    await login(email, password);
+    const account = await login(email, password);
     setAuthOpen(false);
+    setToast({
+      id: Date.now(),
+      title: "Sesión iniciada correctamente",
+      message: `¡Hola de nuevo, ${account.name}! Tu cuenta está conectada.`,
+    });
   };
 
   const handleRegister = async (name: string, email: string, password: string) => {
-    await register(name, email, password);
+    const account = await register(name, email, password);
     setAuthOpen(false);
+    setToast({
+      id: Date.now(),
+      title: "¡Registro completado!",
+      message: `Bienvenido a NEXFIT, ${account.name}. Tu cuenta ya está activa.`,
+    });
   };
 
   return (
@@ -183,6 +197,7 @@ export default function App() {
         onLogin={handleLogin}
         onRegister={handleRegister}
       />
+      <Toast toast={toast} onClose={closeToast} />
     </div>
   );
 }

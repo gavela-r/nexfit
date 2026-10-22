@@ -58,12 +58,17 @@ export function useAuth() {
     };
   }, [token]);
 
+  // Devuelven el usuario para poder saludarle en el aviso de bienvenida.
   const login = useCallback(async (email: string, password: string) => {
-    persist(await loginUser(email, password));
+    const session = await loginUser(email, password);
+    persist(session);
+    return session.user;
   }, []);
 
   const register = useCallback(async (name: string, email: string, password: string) => {
-    persist(await registerUser(name, email, password));
+    const session = await registerUser(name, email, password);
+    persist(session);
+    return session.user;
   }, []);
 
   const logout = useCallback(() => {

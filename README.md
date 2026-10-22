@@ -221,7 +221,10 @@ cualquier otra excepción cae en el manejador global y responde `500` en JSON
   carrito real, también después de recargar.
 - **Cuenta**: la cabecera muestra **«Iniciar sesión»** y **«Registro»**. Ambos abren
   `AuthModal` con pestañas, validación local y los avisos del backend (contraseña
-  incorrecta, correo ya registrado...). Al registrarse se crea la fila en `users`,
+  incorrecta, correo ya registrado...). Al completar el acceso aparece un aviso
+  flotante en la esquina inferior derecha («Sesión iniciada correctamente» o
+  «¡Registro completado!») que se cierra solo a los 4,5 s o con la ✕. Al registrarse
+  se crea la fila en `users`,
   se abre una sesión en `sessions` y la cabecera pasa a mostrar el avatar con las
   iniciales y el nombre, junto al botón de salir. El token se guarda en
   `localStorage` (`nexfit_auth_token`) y se revalida al recargar con
