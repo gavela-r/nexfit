@@ -40,8 +40,7 @@ export function CategoriesSection() {
             <div
               className="absolute inset-0 bg-cover bg-center group-hover:scale-110 transition-transform duration-500 ease-out opacity-85"
               style={{
-                backgroundImage:
-                  "url('https://lh3.googleusercontent.com/aida-public/AB6AXuCXvC5h1Ws9dTKONNoMOhwVgq1HvQX5c6MU2DBpiyTwBMlOTsN0hsq0ND2Olj5HOLW9HTdFN0Mr-KmxnRimm1xJatKN8cwT3M-wa4xygWl5WJC5kR5w72PIm7QWJawwE_O_eex1-bywMJ_kA_LNqvVVQmMYrPOfUbxiByklKNE9O2z2W45pa0pH3lwR96rZQG4zqrrQ_QnyQGFBc7f0rGMWzGdLW3sDP_1jAig8ws06hWpW2scuEmqV')",
+                backgroundImage: "url('/assets/images/cat-fitness.jpg')",
               }}
             ></div>
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
@@ -60,8 +59,7 @@ export function CategoriesSection() {
             <div
               className="absolute inset-0 bg-cover bg-center group-hover:scale-110 transition-transform duration-500 ease-out opacity-85"
               style={{
-                backgroundImage:
-                  "url('https://lh3.googleusercontent.com/aida-public/AB6AXuA4i7ZtESwRjATzaJanO8TYKqYdnO-LC5BV42O5WyDDcTdTzno2uYSYZ1NmXY8b5yjoGyXofuw3HylJ99e6TiDVs2nQJSo0T389BSUvj9g8C5qy8aSz1vymko6M8EiNAcnDDIMqQB1FfjQ-uhzLT07WGpCvBGdK3-d7GogyJEZJ0yPgwx7NOGkh8iSc3yNXGj2w1hSDvDsBPUiFLjt3Ye4qs2u3jwOr2uvqFkLk0d_oXaeIhpJw0xjW')",
+                backgroundImage: "url('/assets/images/cat-running.jpg')",
               }}
             ></div>
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
@@ -80,8 +78,7 @@ export function CategoriesSection() {
             <div
               className="absolute inset-0 bg-cover bg-center group-hover:scale-110 transition-transform duration-500 ease-out opacity-85"
               style={{
-                backgroundImage:
-                  "url('https://lh3.googleusercontent.com/aida-public/AB6AXuB6xD6vQRbgCOQY5RE_qKMJ7fiahQo1lhtWHw917T4uz54HxGnDN6B-dhjgo8fdvShw3TtizPXeT-lOsMmoILM6A7ij7ZXiBIohEkE6Cm_FtWCIvi4taRFobxL6DSjHP8NB3zVHvnmmIrhlIjPzF_v3ioZNzaJgOah_stvkU4_T-k4OQlOTi3kgctp2ISYZjGIdW7HvJBL-fkVrEWn324G7S8CTrWpIJjvd9my9H-kQh6FPorOq19V4')",
+                backgroundImage: "url('/assets/images/cat-athleisure.jpg')",
               }}
             ></div>
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
@@ -100,8 +97,7 @@ export function CategoriesSection() {
             <div
               className="absolute inset-0 bg-cover bg-center group-hover:scale-110 transition-transform duration-500 ease-out opacity-85"
               style={{
-                backgroundImage:
-                  "url('https://lh3.googleusercontent.com/aida-public/AB6AXuAXIvsyZW2P-7HQ0ZtyXRtn3ppTm6VnvqjJvjPB_4azGqa5qn87Tsf9Kbtp3bxoc2nTzeNLbUvGKuTL8Hx5imQy8ubkP9WrtOKZ5YDAx1f77GcgB88LXQ9sKoV4q2RbRwWvcQz28aJTY5Bu_TL_kiJMSc-GtH5h7RNw9tNKLgDgwC-JSv-uHZ3D1Ue520Hy9x-K_eOhBuQH_B1dsTxmDJVCstVz5OWVsHYBFZ7HIaBzrSJyDe95y2v7')",
+                backgroundImage: "url('/assets/images/cat-futbol.jpg')",
               }}
             ></div>
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
@@ -120,8 +116,7 @@ export function CategoriesSection() {
             <div
               className="absolute inset-0 bg-cover bg-center group-hover:scale-110 transition-transform duration-500 ease-out opacity-85"
               style={{
-                backgroundImage:
-                  "url('https://lh3.googleusercontent.com/aida-public/AB6AXuA00j2oBRRM3Jd7Kq8q8-DZ42G92wXjsn2FobdWmfkx5SaBu35QtBB4kznthRkqXCIQ4eDx2GZU0gU4_DIjZFYFF_fZ9Wu_kQsD0P8-hHp5BHj0W3uJXEWcsYsLHcHSJLAFLGsQdV_qSP8S1se-vPDj_twi9sShqdbAK4C1tGMUqz69ZuKiDnze686qb1zV4ufOr0qsWbR1IuTG0-zHJHytoZ2yFm0bXNC__q7x_vp8lNCbf9Wsv34f')",
+                backgroundImage: "url('/assets/images/cat-crossfit.jpg')",
               }}
             ></div>
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
@@ -140,8 +135,7 @@ export function CategoriesSection() {
             <div
               className="absolute inset-0 bg-cover bg-center group-hover:scale-110 transition-transform duration-500 ease-out opacity-85"
               style={{
-                backgroundImage:
-                  "url('https://lh3.googleusercontent.com/aida-public/AB6AXuDoNTQS-oLF6cHjZGSuZFtQ5y1HngYvldT0jn49T6R5aEJRU2AZUevTUtqGdTz2eMV1NNX0P_KE40KNKCWPs_ilAUqL2HM8JWvog9vrN1Ho2zyJBqKIrcblIqX5BctbMb1FQwftjyIBW4Suq0bqc9LSUlWc6_sdwESoQluY8aUk-uYW9MXqyoHZb5E77X5xjcKFl88_CXAAex4Ry7CasmDDWvXYcEBZnpRtCxWzq25x1K2L018233EN')",
+                backgroundImage: "url('/assets/images/cat-outdoor.jpg')",
               }}
             ></div>
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>

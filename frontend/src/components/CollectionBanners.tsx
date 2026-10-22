@@ -15,8 +15,7 @@ export function CollectionBanners() {
             <div
               className="absolute inset-0 bg-cover bg-center group-hover:scale-105 transition-transform duration-500 ease-out"
               style={{
-                backgroundImage:
-                  "url('https://lh3.googleusercontent.com/aida-public/AB6AXuC6Uhk9hoq9guD67pbvQrNbD9LPv1BtYNk6Ow-R99jJGY_w-N-LWqh08YAqmAgg5Ol24Fo_oy2bPv-rRQegDk3zxAdmCGNBxmXO1Jh3szhRwPyB0MkTeAP4nfSianq6duFCXBDdZIGVXveCR5bbnx5LihqPoDYzfd4sBN7gqSaJ6p-1ABkBVlY8h1PS6fcghHfQDsomMHigeY30L99XzZlROlYpOX_d9BaeonNZA61t6zY3Z0MCUPwE')",
+                backgroundImage: "url('/assets/images/banner-hombre.jpg')",
               }}
             ></div>
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent"></div>
@@ -51,8 +50,7 @@ export function CollectionBanners() {
             <div
               className="absolute inset-0 bg-cover bg-center group-hover:scale-105 transition-transform duration-500 ease-out"
               style={{
-                backgroundImage:
-                  "url('https://lh3.googleusercontent.com/aida-public/AB6AXuAKINlYW7AUYm2sjD12JgSJkyujWtn2da5mAcGfgISBmsKtS3ya1NQqDSQtWuoLAFD9bHa3IW3blvP6WCMKO1FZ5ezkQ1Kc6qX41vSHJIa2G2aOrF1pxPHHkZr5cRfTsZluiiBlLTcj384eaFRdW8hn46uaQtZ4Y86qlS8RfrKlqAEWFflvTPWtkPzcZfdxF8ObSybwRyFgo3R3Lmi4OALSP61_d6luVS6kVXxecIHK2AQidhny3NZ9')",
+                backgroundImage: "url('/assets/images/banner-mujer.jpg')",
               }}
             ></div>
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent"></div>

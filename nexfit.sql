@@ -487,42 +487,42 @@ VALUES
    (SELECT id FROM categories WHERE slug = 'fitness'),
    'Camiseta Técnica Transpirable NEX-Pro', 'unisex', 34.95, NULL, 4.9,
    'Nuevo', 'nuevo',
-   'https://lh3.googleusercontent.com/aida-public/AB6AXuAnq9_Fkduxvq_30nwHvEkyWgrORIQ4Y8KYi-cIdUzsVPUET1tlGxVg2r8zmgrY30onCs8Y2_RaaYn3HXQ89oiDrEHefELpgoEa7ppaqSRg4r8vvAKTCPDk8GHygvho1Id6l7ehrsYMufJxyr6Yo8v-mlFeTIaYnlu-W8IUfuLFxFE48O19_NxSLSRy7wZZhg6R65kwE3NEpp6ZvgTg8LxxWt7mkqix4rOVNFukeXYuV_b_WpXkhEK0',
+   '/assets/images/product-nex-01.jpg',
    'M', 1),
 
   ('nex-02',
    (SELECT id FROM categories WHERE slug = 'running'),
    'Mallas de Compresión HyperMotion Mujer', 'mujer', 49.95, 62.00, 5.0,
    'Oferta -20%', 'oferta',
-   'https://lh3.googleusercontent.com/aida-public/AB6AXuBKuJ0B32R7RB0fBQTUU1bBX2P2c33AcFUMksZBUg7KJT35k6eBs7zcxOQ9p1NOpLkO7aTZ8KA1i8zmCdrb2xXlRM4dwPRyieHj8_YwN-dhg1W_zaK3cx_fgVkZpGx4773-bKVDgFlh2eJAY5B7BuGG3CreQrS0ZZ5MEUIPdpLnArbM1OZ6Lli9Lo26oFAAHVRmUH3HcjyLvJ9xXKkzdNkcBfaaNS5oxDnu6q2DqJi5pABNKW43pl37',
+   '/assets/images/product-nex-02.jpg',
    'XS', 1),
 
   ('nex-03',
    (SELECT id FROM categories WHERE slug = 'outdoor'),
    'Chaqueta Cortavientos StormRun', 'unisex', 69.90, NULL, 4.8,
    'Técnico', 'tecnico',
-   'https://lh3.googleusercontent.com/aida-public/AB6AXuBnf39niKQ7sidC-hC3Dzpoq6Y4nOirLll3gE-JVDp_-ilCGTF0JQ1EPaPtMKO3VVgM6aLdXvK2svUDaKbB1rjutkpNcNh6W8jEyNaT5z_GYLSXHPhhmFTiDS59_yA0g9hVNJkwwDYxfa42XK2irtMFRrUdeIUDD5hIO4_wlED_yjadynZD-woOGfsfn-jeIX-NIpTlZEqALDj8pkISwHOCWt0kDekgXBGbWOaLzVJ5lySe9YtYVz2z',
+   '/assets/images/product-nex-03.jpg',
    'L', 1),
 
   ('nex-04',
    (SELECT id FROM categories WHERE slug = 'athleisure'),
    'Sudadera Athleisure Oversize Fleece', 'unisex', 55.00, NULL, 4.7,
    'Tendencia', 'tendencia',
-   'https://lh3.googleusercontent.com/aida-public/AB6AXuD6f4FSChPL4WpWbwjI2OhHm9pQeImKk9B9Za7dazCfxb-xgdEPOdhO_I-oyNkVeDci4YwB9I3umxAjs6966uQOl50DU-_LxMZFORG4AF2EKevwRCdE5Tayczam0eHa4Pt6kO34QgYjmue0-WLWwey2Vy4pDhIe_ZL9c911HAQDxrOqo7DC4aG1RoqkGLybtLGy4oUyrRvMiWmGZLYWStWWW6tyFO_oUe-6uKN2urw4yULfaGu_X4o9',
+   '/assets/images/product-nex-04.jpg',
    'M', 1),
 
   ('nex-05',
    (SELECT id FROM categories WHERE slug = 'crossfit'),
    'Pantalón Corto 2 en 1 TrainReady', 'unisex', 32.50, NULL, 4.9,
    'Best Seller', 'bestseller',
-   'https://lh3.googleusercontent.com/aida-public/AB6AXuBUSGNsUB9nMKa3hgpcwnrCrUK4MxAY5jg9nC6aID7qeDYAh0DIkG9IEPDXJAotjxt03WBLf-ESKzNsapZsnB_D8t7jMyIFD9EAf0vLmaF1gLeFuo80rhHRuVoFMZNYA1GXB5aN7NHhdYx5Pa9o4si4o7zFphRTo3syH8w5UeXFWFBxH2pG4CQaneujNH1tb5dgxYnInP4dkbXBJ9CR-pW0d9gjhZHA869m_v5sKuqlxpKg990HeXxo',
+   '/assets/images/product-nex-05.jpg',
    'L', 1),
 
   ('nex-06',
    (SELECT id FROM categories WHERE slug = 'running'),
    'Top Deportivo Impact Control', 'mujer', 28.95, NULL, 4.9,
    'Soporte Alto', 'soporte',
-   'https://lh3.googleusercontent.com/aida-public/AB6AXuD7sicitLRWd5OI-jXZMZd_ZflhlhYblkiLVfehndVLLXVJSzVWYLZf5GsLJIGLN-ktDBlc8RclqVz7_1WjWAiLQ_4ym7GsAig3D7CpPG7izy4pTSaQb8SmmOvF5NKhxNCo5egth0UzI8LMvPEQwATBIRNWd4vXzZ6gN2Yn9reT_sQTpmM5GAaTPR4kb_Pz04vmmAcQsMze5K4BYHaTkGmDOkTR_1otD56XKwz2cwbUMXm8lRkJN-bU',
+   '/assets/images/product-nex-06.jpg',
    'S', 1);
 
 -- ----------------------------------------------------------------------------

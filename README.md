@@ -96,6 +96,7 @@ nexfit/
 │   ├── postcss.config.js
 │   ├── public/
 │   │   └── assets/               # Vídeos HD y póster del hero
+│   │       └── images/           # 15 fotos de la tienda (productos, banners y categorías)
 │   └── src/
 │       ├── main.tsx              # Punto de entrada
 │       ├── App.tsx               # Composición de la página
@@ -274,8 +275,13 @@ cualquier otra excepción cae en el manejador global y responde `500` en JSON
   (`utils/password.ts`), nunca en claro, en `users.password_hash`. Los tokens son
   32 bytes aleatorios y viven en la tabla `sessions`
   (`token`, `user_id`, `expires_at`, `last_used_at`); al cerrar sesión se borra la fila.
-- **Imágenes de producto**: las tarjetas y banners usan URLs remotas tal y como figuran
-  en la maqueta original.
+- **Imágenes alojadas en local**: las 15 fotografías de la tienda (6 productos, 2 banners
+  de colección, 6 tarjetas de categoría y la imagen del banner tecnológico) viven en
+  `frontend/public/assets/images`, de donde Vite las copia a `frontend/dist` en cada build.
+  De este modo la página no depende de ningún tercero ni puede quedarse sin fotos.
+  `products.ts` las referencia como `/assets/images/…` y el mismo valor se guarda en la
+  columna `image_url` de la tabla `products` (`nexfit.sql` y la BD viva), así que el
+  catálogo que sirve el backend y el respaldo local del frontend coinciden.
 - Se recomienda ejecutar `npm run typecheck` y `npm run build` antes de compartir cambios.
 
 ## 7. Formateo

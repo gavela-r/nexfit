@@ -68,8 +68,7 @@ export function TechBanner() {
                   <div
                     className="w-full h-full bg-cover bg-center"
                     style={{
-                      backgroundImage:
-                        "url('https://lh3.googleusercontent.com/aida-public/AB6AXuCiLVuXoatinfddKhMi_GX-4BDTIz51v1f7JhD18JWHXhXeUHayjAZ7fpaJQJqb3JLrH9PK8RKbhurvmvtBhFOQw4dDAt-wIamb0joTVfGM2V8BnJNMXkq9rNeBmC-tRX-HooW0ehKkQUo3hDxg8X3viREpbsoqSJrCW5mys5F_57RKBDCxCZIo4sO9sMkqsX2wK0JzVuqAd4UvwgL-Uh4LYEwP2lmgSQE8TDChsQFP3Hw5uTg5kWr3')",
+                      backgroundImage: "url('/assets/images/tech-nex-breathe.jpg')",
                     }}
                   ></div>
                   <div className="absolute bottom-3 left-3 bg-slate-900/90 backdrop-blur-sm px-2.5 py-1 rounded-lg text-[11px] font-mono text-white">
