@@ -109,7 +109,7 @@ nexfit/
 │       └── components/
 │           ├── AnnouncementBar.tsx     # Barra de anuncio superior
 │           ├── Header.tsx              # Logo, nav, buscador, acceso, carrito y tema
-│           ├── AuthModal.tsx           # Acceso: iniciar sesión / crear cuenta
+│           ├── AuthModal.tsx           # Acceso: modal de dos columnas (formulario + ventajas)
 │           ├── HeroSection.tsx         # Hero con vídeo HD sincronizado
 │           ├── CollectionBanners.tsx   # Colecciones Hombre / Mujer
 │           ├── CategoriesSection.tsx   # 6 disciplinas deportivas
@@ -219,16 +219,18 @@ cualquier otra excepción cae en el manejador global y responde `500` en JSON
   `favorites` (si no hay sesión, abre el panel de acceso) y el botón «Añadir»
   actualiza el contador y envía la línea a `cart_items`; la cabecera refleja el
   carrito real, también después de recargar.
-- **Cuenta**: la cabecera muestra **«Iniciar sesión»** y **«Registro»**. Ambos abren
-  `AuthModal` con pestañas, validación local y los avisos del backend (contraseña
-  incorrecta, correo ya registrado...). Al completar el acceso aparece un aviso
-  flotante en la esquina inferior derecha («Sesión iniciada correctamente» o
-  «¡Registro completado!») que se cierra solo a los 4,5 s o con la ✕. Al registrarse
-  se crea la fila en `users`,
-  se abre una sesión en `sessions` y la cabecera pasa a mostrar el avatar con las
-  iniciales y el nombre, junto al botón de salir. El token se guarda en
-  `localStorage` (`nexfit_auth_token`) y se revalida al recargar con
-  `GET /api/auth/me`; si ha dejado de ser válido, se descarta sin avisar.
+- **Cuenta**: la cabecera muestra **«Entrar»** y **«Registro»**. Ambos abren
+  `AuthModal`, un modal de dos columnas: a la izquierda el formulario (iniciar sesión o
+  crear cuenta, con cambio mediante enlace, ojo para mostrar la contraseña y validación
+  local) y a la derecha un panel oscuro con las ventajas del club. Los errores del backend
+  (contraseña incorrecta, correo ya registrado...) aparecen bajo los campos. Al completar
+  el acceso aparece un aviso flotante en la esquina inferior derecha («Sesión iniciada
+  correctamente» o «¡Registro completado!») que se cierra solo a los 4,5 s o con la ✕.
+  «Recordar mi sesión» decide dónde se guarda el token: `localStorage` si está marcado o
+  `sessionStorage` si no (la sesión caduca al cerrar el navegador). En ambos casos se
+  revalida al recargar con `GET /api/auth/me` y, si ha dejado de ser válido, se descarta
+  sin avisar. Al registrarse se crea la fila en `users` y se abre una sesión en `sessions`;
+  la cabecera pasa a mostrar el avatar con las iniciales, el nombre y el botón de salir.
 - **Contadores**: el carrito y los favoritos muestran cifras reales de la base
   (0 si el usuario aún no tiene nada) y se mantienen al recargar y entre sesiones.
 - **Newsletter**: alta real contra la API con estados de carga, éxito y error.

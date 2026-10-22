@@ -132,8 +132,8 @@ export default function App() {
   }
 
   // Tras un acceso correcto el panel se cierra y se confirma con un aviso.
-  const handleLogin = async (email: string, password: string) => {
-    const account = await login(email, password);
+  const handleLogin = async (email: string, password: string, remember: boolean) => {
+    const account = await login(email, password, remember);
     setAuthOpen(false);
     setToast({
       id: Date.now(),

@@ -13,8 +13,15 @@ import {
 
 const STORAGE_KEY = "nexfit_auth_token";
 
+// «Recordar mi sesión» guarda el token en localStorage (sobrevive al cierre
+// del navegador). Sin recordar, se usa sessionStorage y caduca al cerrar.
 function readStoredToken(): string | null {
-  return window.localStorage.getItem(STORAGE_KEY);
+  return window.localStorage.getItem(STORAGE_KEY) ?? window.sessionStorage.getItem(STORAGE_KEY);
+}
+
+function clearStoredToken() {
+  window.localStorage.removeItem(STORAGE_KEY);
+  window.sessionStorage.removeItem(STORAGE_KEY);
 }
 
 export function useAuth() {
@@ -23,8 +30,10 @@ export function useAuth() {
   // Hay sesión guardada pero aún no se ha validado (evita parpadeo en la cabecera).
   const [restoring, setRestoring] = useState(() => readStoredToken() !== null);
 
-  const persist = (session: AuthSession) => {
-    window.localStorage.setItem(STORAGE_KEY, session.token);
+  const persist = (session: AuthSession, remember: boolean) => {
+    clearStoredToken();
+    const storage = remember ? window.localStorage : window.sessionStorage;
+    storage.setItem(STORAGE_KEY, session.token);
     setToken(session.token);
     setUser(session.user);
   };
@@ -45,7 +54,7 @@ export function useAuth() {
       .catch(() => {
         // Token caducado o desconocido: se limpia para no mostrar una cuenta falsa.
         if (!active) return;
-        window.localStorage.removeItem(STORAGE_KEY);
+        clearStoredToken();
         setToken(null);
         setUser(null);
       })
@@ -59,22 +68,22 @@ export function useAuth() {
   }, [token]);
 
   // Devuelven el usuario para poder saludarle en el aviso de bienvenida.
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string, remember = true) => {
     const session = await loginUser(email, password);
-    persist(session);
+    persist(session, remember);
     return session.user;
   }, []);
 
   const register = useCallback(async (name: string, email: string, password: string) => {
     const session = await registerUser(name, email, password);
-    persist(session);
+    persist(session, true);
     return session.user;
   }, []);
 
   const logout = useCallback(() => {
     // El cierre en el servidor es en segundo plano: la UI responde al instante.
     if (token) void logoutUser(token).catch(() => undefined);
-    window.localStorage.removeItem(STORAGE_KEY);
+    clearStoredToken();
     setToken(null);
     setUser(null);
   }, [token]);

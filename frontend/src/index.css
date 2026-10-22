@@ -104,3 +104,38 @@ aside {
     animation: none;
   }
 }
+
+/* --------------------------------------------------- Modal de acceso */
+/* Panel oscuro con degradado naranja y trama de puntos. */
+.auth-panel {
+  background-color: #0b1220;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    radial-gradient(520px 280px at 108% -12%, rgba(255, 90, 31, 0.24), transparent 62%),
+    linear-gradient(160deg, #101a2c 0%, #0b1220 60%);
+  background-size:
+    20px 20px,
+    auto,
+    auto;
+}
+
+/* Entrada del modal: sube y crece ligeramente. */
+@keyframes auth-modal-pop {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.auth-modal-enter {
+  animation: auth-modal-pop 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-modal-enter {
+    animation: none;
+  }
+}
