@@ -6,12 +6,17 @@ import {
   addFavorite,
   getCart,
   getFavorites,
+  removeCartItem,
   removeFavorite,
+  updateCartItem,
   type CartItemInput,
+  type CartItemView,
+  type CartView,
 } from "./api";
 import { AnnouncementBar } from "./components/AnnouncementBar";
 import { AuthModal } from "./components/AuthModal";
 import { BeginnerGuide } from "./components/BeginnerGuide";
+import { CartDrawer, cartLineKey } from "./components/CartDrawer";
 import { CatalogSection } from "./components/CatalogSection";
 import { CategoriesSection } from "./components/CategoriesSection";
 import { CollectionBanners } from "./components/CollectionBanners";
@@ -33,6 +38,13 @@ export default function App() {
   const { theme, toggleTheme } = useTheme();
   const { user, token, restoring, login, register, logout } = useAuth();
   const [cartCount, setCartCount] = useState(0);
+  // Panel lateral de la cesta: abierto/cerrado, líneas reales y estado de red.
+  const [cartOpen, setCartOpen] = useState(false);
+  const [cart, setCart] = useState<CartView | null>(null);
+  const [cartLoading, setCartLoading] = useState(false);
+  const [cartError, setCartError] = useState<string | null>(null);
+  // Línea que está esperando respuesta del backend (bloquea sus botones).
+  const [busyLine, setBusyLine] = useState<string | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   // Compartido entre el buscador global y el campo del catálogo.
@@ -56,19 +68,81 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // El contador sale del carrito real: de la cuenta o del invitado (X-Cart-Token).
+  // Cesta completa: el panel lateral y el contador comparten esta lectura.
+  const loadCart = useCallback(async () => {
+    setCartLoading(true);
+    try {
+      const data = await getCart(token ?? undefined);
+      setCart(data);
+      setCartCount(data.count);
+      setCartError(null);
+    } catch {
+      setCartError("No se pudo cargar la cesta. Comprueba que la API está en marcha.");
+    } finally {
+      setCartLoading(false);
+    }
+  }, [token]);
+
+  // Al cargar la página o cambiar de sesión se refresca la cesta.
   useEffect(() => {
     if (restoring) return;
-    let active = true;
-    void getCart(token ?? undefined)
-      .then((cart) => {
-        if (active) setCartCount(cart.count);
+    void loadCart();
+  }, [restoring, loadCart]);
+
+  // Cada vez que se abre el panel se piden las líneas actualizadas.
+  useEffect(() => {
+    if (!cartOpen) return;
+    void loadCart();
+  }, [cartOpen, loadCart]);
+
+  // Alta optimista: la UI responde al instante y el backend manda después.
+  const handleAddToCart = (item: CartItemInput) => {
+    setCartCount((current) => current + item.quantity);
+    void addCartItem(item, token ?? undefined)
+      .then((data) => {
+        setCart(data);
+        setCartCount(data.count);
+        setCartError(null);
       })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, [token, restoring]);
+      .catch(() => setCartCount((current) => Math.max(0, current - item.quantity)));
+  };
+
+  // Cambiar la cantidad de una línea (el backend la persiste al momento).
+  const handleChangeQuantity = (item: CartItemView, quantity: number) => {
+    const next = Math.min(99, Math.max(1, quantity));
+    if (next === item.quantity) return;
+
+    const key = cartLineKey(item);
+    setBusyLine(key);
+    setCartError(null);
+
+    void updateCartItem(
+      item.productId,
+      { size: item.size, color: item.color, quantity: next },
+      token ?? undefined,
+    )
+      .then((data) => {
+        setCart(data);
+        setCartCount(data.count);
+      })
+      .catch(() => setCartError("No se pudo actualizar la cantidad. Inténtalo de nuevo."))
+      .finally(() => setBusyLine(null));
+  };
+
+  // Quitar la línea concreta (talla y color), no todas las del producto.
+  const handleRemoveFromCart = (item: CartItemView) => {
+    const key = cartLineKey(item);
+    setBusyLine(key);
+    setCartError(null);
+
+    void removeCartItem(item.productId, token ?? undefined, { size: item.size, color: item.color })
+      .then((data) => {
+        setCart(data);
+        setCartCount(data.count);
+      })
+      .catch(() => setCartError("No se pudo quitar la prenda de la cesta."))
+      .finally(() => setBusyLine(null));
+  };
 
   // Favoritos del usuario (tabla `favorites`): solo con sesión iniciada.
   useEffect(() => {
@@ -86,14 +160,6 @@ export default function App() {
       active = false;
     };
   }, [token]);
-
-  // Alta optimista: la UI responde al instante y el backend manda después.
-  const handleAddToCart = (item: CartItemInput) => {
-    setCartCount((current) => current + item.quantity);
-    void addCartItem(item, token ?? undefined)
-      .then((cart) => setCartCount(cart.count))
-      .catch(() => setCartCount((current) => Math.max(0, current - item.quantity)));
-  };
 
   // Marcar/desmarcar favorito (si no hay sesión, abre el panel de acceso).
   const handleToggleFavorite = (productId: string) => {
@@ -115,6 +181,37 @@ export default function App() {
       .catch(() => setFavoriteIds(favoriteIds));
   };
 
+  const closeCart = useCallback(() => setCartOpen(false), []);
+
+  // «Explorar catálogo» desde la cesta vacía.
+  const handleGoShopping = () => {
+    setCartOpen(false);
+    window.setTimeout(() => {
+      document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  };
+
+  // No hay pasarela de pago: el pedido se simula y se avisa.
+  const handleCheckout = (total: number) => {
+    setCartOpen(false);
+    setToast({
+      id: Date.now(),
+      title: "Pedido de demostración",
+      message: `La pasarela de pago no está conectada. Importe simulado: ${total
+        .toFixed(2)
+        .replace(".", ",")} €.`,
+    });
+  };
+
+  const handleViewDetails = () => {
+    setToast({
+      id: Date.now(),
+      title: "Cesta detallada",
+      message:
+        "La vista detallada llegará con el checkout. De momento puedes gestionar todo desde el panel.",
+    });
+  };
+
   // Elegir un resultado: filtra el catálogo con ese producto y lleva hasta él.
   const handleSelectSearch = (query: string) => {
     setCatalogQuery(query);
@@ -124,9 +221,10 @@ export default function App() {
     }, 0);
   };
 
-  // Abre el panel de acceso con la pestaña pedida (y cierra el buscador).
+  // Abre el panel de acceso con la pestaña pedida (cierra buscador y cesta).
   function openAuth(tab: AuthTab) {
     setSearchOpen(false);
+    setCartOpen(false);
     setAuthTab(tab);
     setAuthOpen(true);
   }
@@ -161,6 +259,7 @@ export default function App() {
         cartCount={cartCount}
         favoritesCount={favoriteIds.length}
         onOpenSearch={() => setSearchOpen(true)}
+        onOpenCart={() => setCartOpen(true)}
         user={user}
         restoring={restoring}
         onOpenLogin={() => openAuth("login")}
@@ -189,6 +288,25 @@ export default function App() {
         open={searchOpen}
         onClose={() => setSearchOpen(false)}
         onSelectQuery={handleSelectSearch}
+      />
+      <CartDrawer
+        busyLine={busyLine}
+        cart={cart}
+        error={cartError}
+        favoriteIds={favoriteIds}
+        isAuthenticated={Boolean(token)}
+        loading={cartLoading}
+        onAddUpsell={handleAddToCart}
+        onCheckout={handleCheckout}
+        onClose={closeCart}
+        onGoShopping={handleGoShopping}
+        onOpenAuth={() => openAuth("login")}
+        onQuantityChange={handleChangeQuantity}
+        onRemove={handleRemoveFromCart}
+        onRetry={() => void loadCart()}
+        onToggleFavorite={handleToggleFavorite}
+        onViewDetails={handleViewDetails}
+        open={cartOpen}
       />
       <AuthModal
         open={authOpen}

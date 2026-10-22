@@ -44,6 +44,8 @@ interface CartLineRow extends RowDataPacket {
   unit_price: number;
   product_name: string;
   image_url: string;
+  category_label: string | null;
+  color_name: string | null;
 }
 
 const EMPTY_CART: CartView = { items: [], count: 0, total: 0, cartToken: null };
@@ -101,9 +103,13 @@ async function readCart(cart: CartRef | null): Promise<CartView> {
 
   const lines = await rows<CartLineRow>(
     `SELECT ci.product_id, ci.size, ci.color_hex, ci.quantity, ci.unit_price,
-            p.name AS product_name, p.image_url
+            p.name AS product_name, p.image_url,
+            c.label AS category_label, pc.color_name
        FROM cart_items ci
        JOIN products p ON p.id = ci.product_id
+       LEFT JOIN categories c ON c.id = p.category_id
+       LEFT JOIN product_colors pc
+              ON pc.product_id = ci.product_id AND pc.color_hex = ci.color_hex
       WHERE ci.cart_id = ?
       ORDER BY ci.added_at, ci.id`,
     [cart.id],
@@ -117,6 +123,8 @@ async function readCart(cart: CartRef | null): Promise<CartView> {
     unitPrice: Number(line.unit_price),
     name: line.product_name,
     image: line.image_url,
+    ...(line.category_label ? { category: line.category_label } : {}),
+    ...(line.color_name ? { colorName: line.color_name } : {}),
   }));
 
   const count = items.reduce((total, item) => total + item.quantity, 0);
@@ -190,20 +198,62 @@ export async function addLine(identity: CartIdentity, input: CartLineInput): Pro
   return readCart(cart);
 }
 
-/** Quita todas las líneas de un producto (la cantidad la decide el cliente). */
-export async function removeLine(identity: CartIdentity, productId: string): Promise<CartView> {
+/** Quita las líneas de un producto (o solo la de una talla y color concretos). */
+export async function removeLine(
+  identity: CartIdentity,
+  productId: string,
+  line: { size?: string; color?: string } = {},
+): Promise<CartView> {
   const cart = await resolveCart(identity, false);
   if (!cart) {
     throw ApiError.notFound(`El producto "${productId}" no está en el carrito`);
   }
 
-  const result = await run("DELETE FROM cart_items WHERE cart_id = ? AND product_id = ?", [
-    cart.id,
-    productId,
-  ]);
+  let sql = "DELETE FROM cart_items WHERE cart_id = ? AND product_id = ?";
+  const params: (string | number)[] = [cart.id, productId];
+
+  if (line.size) {
+    sql += " AND size = ?";
+    params.push(line.size);
+  }
+  if (line.color) {
+    sql += " AND color_hex = ?";
+    params.push(line.color);
+  }
+
+  const result = await run(sql, params);
 
   if (result.affectedRows === 0) {
     throw ApiError.notFound(`El producto "${productId}" no está en el carrito`);
+  }
+
+  return readCart(cart);
+}
+
+/** Cambia la cantidad de una línea concreta (misma talla y color). */
+export async function updateLine(
+  identity: CartIdentity,
+  productId: string,
+  input: { size: string; color: string; quantity: number },
+): Promise<CartView> {
+  if (!Number.isInteger(input.quantity) || input.quantity < 1 || input.quantity > 99) {
+    throw ApiError.badRequest("La cantidad debe estar entre 1 y 99");
+  }
+
+  const cart = await resolveCart(identity, false);
+  if (!cart) {
+    throw ApiError.notFound(`El producto "${productId}" no está en el carrito`);
+  }
+
+  const result = await run(
+    `UPDATE cart_items
+        SET quantity = ?
+      WHERE cart_id = ? AND product_id = ? AND size = ? AND color_hex = ?`,
+    [input.quantity, cart.id, productId, input.size, input.color],
+  );
+
+  if (result.affectedRows === 0) {
+    throw ApiError.notFound(`El producto "${productId}" no está en el carrito con esa talla y color`);
   }
 
   return readCart(cart);

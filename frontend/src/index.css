@@ -40,6 +40,7 @@ html.dark body {
 
 /* ---------------------------------------------------------- utilidades UI */
 .custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
   height: 4px;
 }
 
@@ -136,6 +137,41 @@ aside {
 
 @media (prefers-reduced-motion: reduce) {
   .auth-modal-enter {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------- Panel de la cesta */
+/* El panel entra desde la derecha y el fondo aparece con un fundido. */
+@keyframes cart-drawer-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.cart-drawer-enter {
+  animation: cart-drawer-in 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes cart-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.cart-overlay-enter {
+  animation: cart-overlay-in 220ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cart-drawer-enter,
+  .cart-overlay-enter {
     animation: none;
   }
 }

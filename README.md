@@ -102,7 +102,7 @@ nexfit/
 │       ├── index.css             # Base de Tailwind + estilos globales
 │       ├── api/index.ts          # Cliente HTTP con respaldo local
 │       ├── hooks/useTheme.ts     # Modo claro/oscuro persistido
-│       ├── hooks/useAuth.ts      # Sesión: registro, login y token en localStorage
+│       ├── hooks/useAuth.ts      # Sesión: registro, login y token (localStorage/sessionStorage)
 │       ├── utils/format.ts       # Formato de precios (es-ES)
 │       ├── utils/search.ts       # Búsqueda sin tildes ni mayúsculas
 │       ├── data/products.ts      # Catálogo tipado (respaldo)
@@ -110,6 +110,7 @@ nexfit/
 │           ├── AnnouncementBar.tsx     # Barra de anuncio superior
 │           ├── Header.tsx              # Logo, nav, buscador, acceso, carrito y tema
 │           ├── AuthModal.tsx           # Acceso: modal de dos columnas (formulario + ventajas)
+│           ├── CartDrawer.tsx          # Panel lateral de la cesta (líneas, totales y upsell)
 │           ├── HeroSection.tsx         # Hero con vídeo HD sincronizado
 │           ├── CollectionBanners.tsx   # Colecciones Hombre / Mujer
 │           ├── CategoriesSection.tsx   # 6 disciplinas deportivas
@@ -154,7 +155,8 @@ sesiones, carrito, favoritos y newsletter.
 | `GET`    | `/api/categories`            | Las 6 disciplinas con su número de artículos                                                  |
 | `GET`    | `/api/cart`                  | Carrito (unidades y total) del usuario o del invitado                                         |
 | `POST`   | `/api/cart/items`            | Añade una línea (`productId`, `size`, `color`, `quantity`)                                    |
-| `DELETE` | `/api/cart/items/:productId` | Quita un producto del carrito                                                                 |
+| `PATCH`  | `/api/cart/items/:productId` | Cambia la cantidad de una línea (`size`, `color`, `quantity` entre 1 y 99)                    |
+| `DELETE` | `/api/cart/items/:productId` | Quita una línea; acepta `?size=` y `?color=` para no borrar otras tallas del mismo producto   |
 | `DELETE` | `/api/cart`                  | Vacía el carrito                                                                              |
 | `GET`    | `/api/favorites`             | Favoritos del usuario · requiere sesión                                                       |
 | `POST`   | `/api/favorites`             | Marca un producto (`{ "productId": "nex-01" }`) · requiere sesión                             |
@@ -219,6 +221,18 @@ cualquier otra excepción cae en el manejador global y responde `500` en JSON
   `favorites` (si no hay sesión, abre el panel de acceso) y el botón «Añadir»
   actualiza el contador y envía la línea a `cart_items`; la cabecera refleja el
   carrito real, también después de recargar.
+- **Cesta (panel lateral)**: el botón del carrito de la cabecera abre `CartDrawer`,
+  un panel que entra desde la derecha sobre un fondo difuminado. Muestra las líneas
+  reales de `cart_items` (miniatura con la categoría, nombre, talla, color con su
+  nombre comercial y precio), la barra de progreso hacia el envío gratis (50 €), una
+  sugerencia para completar la equipación con un producto del catálogo que aún no
+  esté en la cesta y el resumen con subtotal, descuento Club del 10 % (`CLUB10`,
+  solo con sesión), envío y total con IVA. El stepper y la papelera escriben en MySQL
+  al momento (`PATCH` y `DELETE` con talla y color); el corazón usa `favorites`.
+  «Tramitar Pedido» y «Ver Cesta Detallada» son acciones de demostración (muestran un
+  aviso, porque no hay pasarela de pago). El estado vacío invita a explorar el catálogo.
+  En móvil ocupa toda la pantalla y, con el panel abierto, `Esc` o un clic en el fondo
+  lo cierran.
 - **Cuenta**: la cabecera muestra **«Entrar»** y **«Registro»**. Ambos abren
   `AuthModal`, un modal de dos columnas: a la izquierda el formulario (iniciar sesión o
   crear cuenta, con cambio mediante enlace, ojo para mostrar la contraseña y validación

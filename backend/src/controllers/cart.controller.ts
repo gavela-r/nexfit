@@ -38,9 +38,40 @@ export async function addLine(req: Request, res: Response): Promise<void> {
   respond(res, cart, 201);
 }
 
-/** DELETE /api/cart/items/:productId */
+/** PATCH /api/cart/items/:productId */
+export async function updateLine(req: Request, res: Response): Promise<void> {
+  const { size, color, quantity } = req.body as Partial<{
+    size: string;
+    color: string;
+    quantity: number;
+  }>;
+
+  if (typeof size !== "string" || typeof color !== "string" || typeof quantity !== "number") {
+    throw ApiError.badRequest("El cuerpo debe incluir size, color y quantity");
+  }
+
+  respond(
+    res,
+    await service.updateLine(await identityOf(req), req.params.productId, {
+      size,
+      color,
+      quantity,
+    }),
+  );
+}
+
+/** DELETE /api/cart/items/:productId?size=..&color=.. */
 export async function removeLine(req: Request, res: Response): Promise<void> {
-  respond(res, await service.removeLine(await identityOf(req), req.params.productId));
+  const size = typeof req.query.size === "string" ? req.query.size : undefined;
+  const color = typeof req.query.color === "string" ? req.query.color : undefined;
+
+  respond(
+    res,
+    await service.removeLine(await identityOf(req), req.params.productId, {
+      ...(size ? { size } : {}),
+      ...(color ? { color } : {}),
+    }),
+  );
 }
 
 /** DELETE /api/cart */

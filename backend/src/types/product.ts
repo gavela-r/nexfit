@@ -43,6 +43,10 @@ export interface CartItem {
   /** Datos de apoyo para pintar el carrito (los añade el servicio desde products). */
   name?: string;
   image?: string;
+  /** Etiqueta de la categoría (badge del panel de la cesta). */
+  category?: string;
+  /** Nombre comercial del color («Verde pino», «Negro»...). */
+  colorName?: string;
 }
 
 export interface NewsletterSubscriber {

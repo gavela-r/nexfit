@@ -12,6 +12,8 @@ interface HeaderProps {
   favoritesCount: number;
   /** Abre el buscador global (panel superpuesto). */
   onOpenSearch: () => void;
+  /** Abre el panel lateral de la cesta. */
+  onOpenCart: () => void;
   /** Usuario de la sesión abierta; null mientras no haya nadie registrado. */
   user: AuthUser | null;
   /** Sesión guardada que aún se está validando al cargar la página. */
@@ -48,6 +50,7 @@ export function Header({
   cartCount,
   favoritesCount,
   onOpenSearch,
+  onOpenCart,
   user,
   restoring,
   onOpenLogin,
@@ -251,7 +254,11 @@ export function Header({
             {/* Carrito */}
             <button
               aria-label="Carrito de compras"
-              className="relative flex items-center gap-2 bg-slate-900 hover:bg-slate-800 dark:bg-primary dark:hover:bg-[#E04B16] text-white px-3 sm:px-4 py-2.5 rounded-xl transition-all shadow-sm"
+              aria-haspopup="dialog"
+              title="Abrir la cesta"
+              type="button"
+              onClick={onOpenCart}
+              className="relative flex items-center gap-2 bg-slate-900 hover:bg-slate-800 dark:bg-primary dark:hover:bg-[#E04B16] text-white px-3 sm:px-4 py-2.5 rounded-xl transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
             >
               <span className="material-symbols-outlined text-[21px]" data-icon="shopping_cart">
                 shopping_cart

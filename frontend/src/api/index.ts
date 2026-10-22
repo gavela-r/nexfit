@@ -21,6 +21,10 @@ export interface CartItemView extends CartItemInput {
   unitPrice: number;
   name?: string;
   image?: string;
+  /** Etiqueta de la categoría para el badge del panel. */
+  category?: string;
+  /** Nombre comercial del color. */
+  colorName?: string;
 }
 
 export interface CartView {
@@ -134,12 +138,34 @@ export async function addCartItem(item: CartItemInput, token?: string): Promise<
   });
 }
 
-/** Quita un producto del carrito. */
-export async function removeCartItem(productId: string, token?: string): Promise<CartView> {
+/** Cambia la cantidad de una línea concreta (misma talla y color). */
+export async function updateCartItem(
+  productId: string,
+  line: Pick<CartItemInput, "size" | "color" | "quantity">,
+  token?: string,
+): Promise<CartView> {
   return cartRequest<CartView>(`/cart/items/${encodeURIComponent(productId)}`, {
-    method: "DELETE",
+    method: "PATCH",
+    body: JSON.stringify(line),
     token,
   });
+}
+
+/** Quita una línea (o todas las del producto si no se indica talla y color). */
+export async function removeCartItem(
+  productId: string,
+  token?: string,
+  line: { size?: string; color?: string } = {},
+): Promise<CartView> {
+  const params = new URLSearchParams();
+  if (line.size) params.set("size", line.size);
+  if (line.color) params.set("color", line.color);
+  const query = params.toString();
+
+  return cartRequest<CartView>(
+    `/cart/items/${encodeURIComponent(productId)}${query ? `?${query}` : ""}`,
+    { method: "DELETE", token },
+  );
 }
 
 /** Vacía el carrito. */
