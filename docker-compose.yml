@@ -1,0 +1,116 @@
+# ============================================================================
+#  NEXFIT · stack completo en Docker
+# ----------------------------------------------------------------------------
+#  Servicios
+#    db ....... MySQL 8 con el esquema y el catálogo de nexfit.sql ya cargados
+#    backend .. API Express (TypeScript compilado, sin dependencias de build)
+#    frontend . React compilado servido por Nginx, que además hace de proxy
+#               de /api hacia el backend (mismo origen: no hay CORS)
+#
+#  Uso
+#    docker compose up -d --build      # levantar todo
+#    docker compose logs -f backend    # ver registros
+#    docker compose down               # parar (conserva los datos)
+#    docker compose down -v            # parar y borrar la base de datos
+#
+#  Direcciones
+#    Frontend .... http://localhost:8080
+#    API ......... http://localhost:4000/api/health
+#    MySQL ....... localhost:3307  (usuario nexfit / contraseña nexfit_pass)
+#
+#  Los valores se pueden cambiar creando un fichero .env (ver .env.example).
+# ============================================================================
+
+name: nexfit
+
+services:
+  # --------------------------------------------------------------------------
+  #  Base de datos
+  #  En el primer arranque (volumen vacío) MySQL ejecuta los scripts de
+  #  /docker-entrypoint-initdb.d: aquí se monta nexfit.sql, que crea la base
+  #  de datos, las tablas, las vistas y carga el catálogo real.
+  # --------------------------------------------------------------------------
+  db:
+    image: mysql:8.0
+    container_name: nexfit-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-nexfit_root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-nexfit}
+      MYSQL_USER: ${MYSQL_USER:-nexfit}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-nexfit_pass}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    ports:
+      - "${DB_PORT:-3307}:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./nexfit.sql:/docker-entrypoint-initdb.d/01_nexfit.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    networks:
+      - nexfit
+
+  # --------------------------------------------------------------------------
+  #  API REST
+  #  El backend de la demo trabaja con datos en memoria; las variables DB_*
+  #  quedan preparadas para cuando se conecte a MySQL.
+  # --------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nexfit-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080,http://localhost:5173,http://localhost:4173}
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: ${MYSQL_DATABASE:-nexfit}
+      DB_USER: ${MYSQL_USER:-nexfit}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-nexfit_pass}
+    ports:
+      - "${BACKEND_PORT:-4000}:4000"
+    depends_on:
+      - db
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+    networks:
+      - nexfit
+
+  # --------------------------------------------------------------------------
+  #  Tienda (React compilado + Nginx)
+  # --------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: nexfit-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - nexfit
+
+volumes:
+  db_data:
+    name: nexfit_db_data
+
+networks:
+  nexfit:
+    name: nexfit_net
+    driver: bridge

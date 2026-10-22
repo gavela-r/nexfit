@@ -1,0 +1,9 @@
+# Ficheros generados o de terceros que no se reformatan
+node_modules
+dist
+package-lock.json
+original
+docs
+DESIGN.md
+frontend/public
+assets

@@ -1,0 +1,17 @@
+# Dependencias y builds
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# Entorno
+.env
+.env.local
+.env.*.local
+
+# Registros y temporales
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.vite/

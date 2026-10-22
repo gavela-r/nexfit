@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ------------------------------------------------------------------ base */
+html,
+body {
+  min-height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+body {
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+/* Fondo del documento en modo oscuro (evita destellos blancos al hacer scroll) */
+html.dark body {
+  background-color: #0b1220;
+  color: #f1f5f9;
+}
+
+/* Iconografía Material Symbols */
+.material-symbols-outlined {
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 400,
+    "GRAD" 0,
+    "opsz" 24;
+  display: inline-block;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+/* ---------------------------------------------------------- utilidades UI */
+.custom-scrollbar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 9999px;
+}
+
+/* Transición suave entre modo claro y oscuro */
+header,
+section,
+footer,
+div,
+nav,
+aside {
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease;
+}
+
+/* Cifras tabulares para precios (DESIGN.md · tipografía) */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}

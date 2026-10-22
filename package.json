@@ -1,0 +1,18 @@
+{
+  "name": "nexfit",
+  "private": true,
+  "version": "1.0.0",
+  "description": "NEXFIT · tienda de ropa deportiva — frontend React + backend TypeScript",
+  "scripts": {
+    "setup": "npm install --prefix frontend && npm install --prefix backend",
+    "dev": "concurrently -n frontend,backend -c cyan,magenta --kill-others-on-fail \"npm run dev --prefix frontend\" \"npm run dev --prefix backend\"",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend",
+    "build": "npm run build --prefix frontend && npm run build --prefix backend",
+    "start": "npm run start --prefix backend",
+    "typecheck": "npm run typecheck --prefix frontend && npm run typecheck --prefix backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
