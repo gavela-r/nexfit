@@ -22,4 +22,15 @@ export const env = {
   /** Ruta al build del frontend para servir la SPA desde el backend.
    *  Se resuelve relativa a la ubicación del código (backend/src o backend/dist). */
   frontendDist: process.env.FRONTEND_DIST ?? "../../frontend/dist",
+  /** Conexión MySQL (todas las tablas del proyecto viven aquí). */
+  db: {
+    host: process.env.DB_HOST ?? "127.0.0.1",
+    port: readInt(process.env.DB_PORT, 3307),
+    user: process.env.DB_USER ?? "nexfit",
+    password: process.env.DB_PASSWORD ?? "nexfit_pass",
+    name: process.env.DB_NAME ?? "nexfit",
+    connectionLimit: readInt(process.env.DB_POOL, 10),
+  },
+  /** Reintentos de arranque mientras MySQL termina de levantar (Docker). */
+  dbRetries: readInt(process.env.DB_RETRIES, 15),
 } as const;

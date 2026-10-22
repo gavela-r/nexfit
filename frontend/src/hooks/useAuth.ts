@@ -74,5 +74,5 @@ export function useAuth() {
     setUser(null);
   }, [token]);
 
-  return { user, restoring, login, register, logout };
+  return { user, token, restoring, login, register, logout };
 }

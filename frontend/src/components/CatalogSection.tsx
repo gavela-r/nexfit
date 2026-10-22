@@ -32,12 +32,21 @@ function applyFilter(items: Product[], filter: Filter): Product[] {
 
 interface CatalogSectionProps {
   onAddToCart: (item: CartItemInput) => void;
+  /** IDs de los productos favoritos del usuario. */
+  favoriteIds: string[];
+  onToggleFavorite: (productId: string) => void;
   /** Término de búsqueda compartido con el buscador de la cabecera. */
   query: string;
   onQueryChange: (query: string) => void;
 }
 
-export function CatalogSection({ onAddToCart, query, onQueryChange }: CatalogSectionProps) {
+export function CatalogSection({
+  onAddToCart,
+  favoriteIds,
+  onToggleFavorite,
+  query,
+  onQueryChange,
+}: CatalogSectionProps) {
   const [items, setItems] = useState<Product[]>(localProducts);
   const [filter, setFilter] = useState<Filter>(FILTERS[0]);
   const [source, setSource] = useState<"local" | "api">("local");
@@ -138,7 +147,13 @@ export function CatalogSection({ onAddToCart, query, onQueryChange }: CatalogSec
         {visible.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
             {visible.map((product) => (
-              <ProductCard key={product.id} product={product} onAddToCart={onAddToCart} />
+              <ProductCard
+                key={product.id}
+                product={product}
+                favorited={favoriteIds.includes(product.id)}
+                onToggleFavorite={onToggleFavorite}
+                onAddToCart={onAddToCart}
+              />
             ))}
           </div>
         ) : (

@@ -58,8 +58,8 @@ services:
 
   # --------------------------------------------------------------------------
   #  API REST
-  #  El backend de la demo trabaja con datos en memoria; las variables DB_*
-  #  quedan preparadas para cuando se conecte a MySQL.
+  #  Persistencia completa en MySQL (usuarios, sesiones, catálogo, carrito,
+  #  favoritos y newsletter). Espera a que la base esté sana antes de arrancar.
   # --------------------------------------------------------------------------
   backend:
     build:
@@ -79,7 +79,8 @@ services:
     ports:
       - "${BACKEND_PORT:-4000}:4000"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/api/health"]
       interval: 10s

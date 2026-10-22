@@ -16,6 +16,8 @@ respetando el diseño definido en `DESIGN.md` (paleta, tipografías Manrope + In
 
 - Node.js **18 o superior** (probado con Node 24)
 - npm 10 o superior
+- **MySQL 8.0.16 o superior**. Lo más rápido es levantar solo la base del stack
+  Docker (`docker compose up -d db`), que publica el puerto **3307**.
 
 ## 2. Puesta en marcha
 
@@ -24,14 +26,21 @@ respetando el diseño definido en `DESIGN.md` (paleta, tipografías Manrope + In
 npm install
 npm run setup          # instala frontend/ y backend/
 
-# 2) Arrancar las dos a la vez (modo desarrollo)
+# 2) Base de datos: esquema + catálogo (solo la primera vez)
+docker compose up -d db
+
+# 3) Arrancar las dos a la vez (modo desarrollo)
 npm run dev
 ```
 
-| Servicio | URL |
-| --- | --- |
+El backend se conecta a MySQL con las variables `DB_*` (por defecto
+`127.0.0.1:3307`, base `nexfit`, usuario `nexfit` / `nexfit_pass`). Si usas otro
+servidor, copia `backend/.env.example` a `backend/.env` y ajusta los valores.
+
+| Servicio                 | URL                   |
+| ------------------------ | --------------------- |
 | Frontend (Vite, con HMR) | http://localhost:5173 |
-| Backend (API Express) | http://localhost:4000 |
+| Backend (API Express)    | http://localhost:4000 |
 
 Vite envía `/api/*` al backend a través del proxy definido en `frontend/vite.config.ts`,
 así que no hay que configurar CORS para el desarrollo.
@@ -117,16 +126,16 @@ nexfit/
     ├── package.json
     ├── tsconfig.json
     ├── Dockerfile                # Build con tsc + imagen node:22-alpine
-    ├── .env.example              # PORT, NODE_ENV, CORS_ORIGIN, FRONTEND_DIST
+    ├── .env.example              # PORT, NODE_ENV, CORS_ORIGIN, DB_*
     └── src/
-        ├── server.ts             # Arranque y cierre ordenado
+        ├── server.ts             # Arranque (espera a MySQL) y cierre ordenado
         ├── app.ts                # Middlewares, rutas y estáticos
-        ├── config/env.ts         # Variables de entorno tipadas
-        ├── routes/               # Definición de endpoints (catálogo, carrito, club, auth)
+        ├── config/env.ts         # Variables de entorno tipadas (incluye DB_*)
+        ├── db/                   # Pool de MySQL, consultas y errores de integridad
+        ├── routes/               # Endpoints (catálogo, carrito, favoritos, club, auth)
         ├── controllers/          # Validación de entrada y respuesta
-        ├── services/             # Lógica de negocio (catálogo, carrito, club, cuentas)
-        ├── middlewares/          # Logger, 404 y manejador de errores
-        ├── data/                 # Catálogo y categorías en memoria
+        ├── services/             # Consultas y lógica de negocio contra MySQL
+        ├── middlewares/          # Auth (Bearer), logger, 404 y errores
         ├── types/                # Modelos de dominio y de respuesta
         └── utils/                # ApiError, asyncHandler, respond, logger, password, normalize
 ```
@@ -134,23 +143,34 @@ nexfit/
 ## 4. API
 
 Todas las respuestas usan el envoltorio `{ "ok": boolean, "data" | "error": ... }`.
+El backend lee y escribe **todo en MySQL** (`nexfit.sql`): catálogo, cuentas,
+sesiones, carrito, favoritos y newsletter.
 
-| Método | Ruta | Descripción |
-| --- | --- | --- |
-| `GET` | `/api/health` | Estado del servicio, versión y uptime |
-| `GET` | `/api/products` | Catálogo. Acepta `?category=`, `?search=` y `?sort=rating\|price-asc\|price-desc` |
-| `GET` | `/api/products/:id` | Detalle de un producto (404 si no existe) |
-| `GET` | `/api/categories` | Las 6 disciplinas con su número de artículos |
-| `GET` | `/api/cart` | Contenido del carrito, unidades y total |
-| `POST` | `/api/cart/items` | Añade una línea (`productId`, `size`, `color`, `quantity`) |
-| `DELETE` | `/api/cart/items/:productId` | Quita un producto del carrito |
-| `DELETE` | `/api/cart` | Vacía el carrito |
-| `POST` | `/api/newsletter/subscribe` | Suscripción al Club NEXFIT (`{ "email": "..." }`) |
-| `GET` | `/api/newsletter/stats` | Número de suscriptores |
-| `POST` | `/api/auth/register` | Crea la cuenta e inicia sesión (`name`, `email`, `password`) · `409` si el correo ya existe |
-| `POST` | `/api/auth/login` | Inicia sesión (`email`, `password`) · `401` si las credenciales no coinciden |
-| `POST` | `/api/auth/logout` | Cierra la sesión del token (`Authorization: Bearer <token>`) |
-| `GET` | `/api/auth/me` | Perfil de la sesión abierta (`Authorization: Bearer <token>`) |
+| Método   | Ruta                         | Descripción                                                                                   |
+| -------- | ---------------------------- | --------------------------------------------------------------------------------------------- |
+| `GET`    | `/api/health`                | Estado del servicio y de la base de datos (`503` si MySQL no responde)                        |
+| `GET`    | `/api/products`              | Catálogo desde MySQL. Acepta `?category=`, `?search=` y `?sort=rating\|price-asc\|price-desc` |
+| `GET`    | `/api/products/:id`          | Detalle de un producto (404 si no existe)                                                     |
+| `GET`    | `/api/categories`            | Las 6 disciplinas con su número de artículos                                                  |
+| `GET`    | `/api/cart`                  | Carrito (unidades y total) del usuario o del invitado                                         |
+| `POST`   | `/api/cart/items`            | Añade una línea (`productId`, `size`, `color`, `quantity`)                                    |
+| `DELETE` | `/api/cart/items/:productId` | Quita un producto del carrito                                                                 |
+| `DELETE` | `/api/cart`                  | Vacía el carrito                                                                              |
+| `GET`    | `/api/favorites`             | Favoritos del usuario · requiere sesión                                                       |
+| `POST`   | `/api/favorites`             | Marca un producto (`{ "productId": "nex-01" }`) · requiere sesión                             |
+| `DELETE` | `/api/favorites/:productId`  | Desmarca un producto · requiere sesión                                                        |
+| `POST`   | `/api/newsletter/subscribe`  | Suscripción al Club NEXFIT (`{ "email": "..." }`)                                             |
+| `GET`    | `/api/newsletter/stats`      | Número de suscriptores                                                                        |
+| `POST`   | `/api/auth/register`         | Crea la cuenta e inicia sesión (`name`, `email`, `password`) · `409` si el correo ya existe   |
+| `POST`   | `/api/auth/login`            | Inicia sesión (`email`, `password`) · `401` si las credenciales no coinciden                  |
+| `POST`   | `/api/auth/logout`           | Cierra la sesión del token (`Authorization: Bearer <token>`)                                  |
+| `GET`    | `/api/auth/me`               | Perfil de la sesión abierta (`Authorization: Bearer <token>`)                                 |
+
+**Identidad del carrito.** Con sesión, el carrito es del usuario
+(`Authorization: Bearer <token>`). Sin sesión, el backend crea una cesta de
+invitado y devuelve `cartToken`; el navegador lo guarda en `localStorage`
+(`nexfit_cart_token`) y lo envía en la cabecera `X-Cart-Token`. Al iniciar
+sesión o registrarse, las líneas del invitado se fusionan con la cuenta.
 
 Ejemplos:
 
@@ -183,7 +203,7 @@ cualquier otra excepción cae en el manejador global y responde `500` en JSON
   `timeupdate`; en pantallas verticales se sustituye por `hero-mobile.mp4` y, si el
   navegador bloquea el autoplay, el vídeo arranca con la primera interacción.
 - **Catálogo**: pide los productos a `/api/products`. Si el backend está apagado,
-  usa el catálogo local y lo indica con el texto *«Catálogo local de respaldo»*.
+  usa el catálogo local y lo indica con el texto _«Catálogo local de respaldo»_.
 - **Filtros**: Más Vendidos · Novedades · Entrenamiento · Running, con estado vacío.
 - **Buscador (doble acceso)**:
   - Icono de lupa en la cabecera y atajo **⌘K / Ctrl+K** abren `SearchOverlay`, un panel
@@ -195,15 +215,19 @@ cualquier otra excepción cae en el manejador global y responde `500` en JSON
     filtro: filtra la rejilla en caliente por nombre o categoría y muestra el recuento
     «X de Y productos». El término está compartido con `App`, así que al elegir un resultado
     del overlay el catálogo se filtra con ese producto y la página hace scroll hasta él.
-- **Tarjetas**: talla, color y favorito en estado local; el botón «Añadir» actualiza
-  el contador del carrito al instante (optimista) y en segundo plano envía la línea
-  al backend (`POST /api/cart/items`).
+- **Tarjetas**: talla, color y favorito. El corazón guarda el producto en
+  `favorites` (si no hay sesión, abre el panel de acceso) y el botón «Añadir»
+  actualiza el contador y envía la línea a `cart_items`; la cabecera refleja el
+  carrito real, también después de recargar.
 - **Cuenta**: la cabecera muestra **«Iniciar sesión»** y **«Registro»**. Ambos abren
   `AuthModal` con pestañas, validación local y los avisos del backend (contraseña
-  incorrecta, correo ya registrado...). Al registrarse se inicia sesión y la cabecera
-  pasa a mostrar el avatar con las iniciales y el nombre, junto al botón de salir.
-  El token se guarda en `localStorage` (`nexfit_auth_token`) y se revalida al recargar
-  con `GET /api/auth/me`; si ha dejado de ser válido, se descarta sin avisar.
+  incorrecta, correo ya registrado...). Al registrarse se crea la fila en `users`,
+  se abre una sesión en `sessions` y la cabecera pasa a mostrar el avatar con las
+  iniciales y el nombre, junto al botón de salir. El token se guarda en
+  `localStorage` (`nexfit_auth_token`) y se revalida al recargar con
+  `GET /api/auth/me`; si ha dejado de ser válido, se descarta sin avisar.
+- **Contadores**: el carrito y los favoritos muestran cifras reales de la base
+  (0 si el usuario aún no tiene nada) y se mantienen al recargar y entre sesiones.
 - **Newsletter**: alta real contra la API con estados de carga, éxito y error.
 - **Cupón MOVE15**: copia al portapapeles y muestra confirmación visual.
 
@@ -217,15 +241,16 @@ cualquier otra excepción cae en el manejador global y responde `500` en JSON
 - **Assets compartidos**: los vídeos y el póster viven en `frontend/public/assets`, de
   donde Vite los copia a `frontend/dist` en cada build. El prototipo `original/code.html`
   apunta a esa misma carpeta.
-- **Datos en memoria**: catálogo, carrito, suscriptores y cuentas se guardan en memoria
-  para que la demo funcione sin base de datos; las interfaces (`services/`) están
-  preparadas para sustituirlos por un repositorio persistente sin tocar rutas ni
-  controladores. Al reiniciar el backend, las cuentas registradas se pierden: es el
-  comportamiento esperado de la demo.
-- **Contraseñas y sesiones**: se guardan con `scrypt` y sal aleatoria (`utils/password.ts`),
-  nunca en claro, y los tokens son cadenas aleatorias de 32 bytes que viven en el mapa de
-  sesiones del servidor. Para producción bastaría cambiar `services/auth.service.ts` por
-  una tabla de usuarios y tokens firmados (JWT) sin tocar la interfaz.
+- **Persistencia en MySQL**: no hay datos de negocio en memoria. `db/pool.ts` abre un
+  pool (`mysql2`) y cada servicio consulta su tabla: `users` y `sessions` (auth),
+  `v_catalog`/`categories` (catálogo), `carts`/`cart_items` (carrito), `favorites`
+  y `newsletter_subscribers`. `nexfit.sql` crea el esquema y los datos de ejemplo.
+  Al arrancar, el backend espera a que MySQL responda antes de abrir el puerto
+  (`waitForDatabase`) y `/api/health` comprueba la conexión.
+- **Contraseñas y sesiones**: las contraseñas se guardan con `scrypt` y sal aleatoria
+  (`utils/password.ts`), nunca en claro, en `users.password_hash`. Los tokens son
+  32 bytes aleatorios y viven en la tabla `sessions`
+  (`token`, `user_id`, `expires_at`, `last_used_at`); al cerrar sesión se borra la fila.
 - **Imágenes de producto**: las tarjetas y banners usan URLs remotas tal y como figuran
   en la maqueta original.
 - Se recomienda ejecutar `npm run typecheck` y `npm run build` antes de compartir cambios.
@@ -251,26 +276,26 @@ Script único en la raíz con todo el modelo de datos de la tienda, escrito para
 mysql -u root -p < nexfit.sql
 ```
 
-- **phpMyAdmin**: pestaña *Importar* → seleccionar `nexfit.sql` → *Continuar*.
-- **MySQL Workbench / DBeaver**: *File → Run SQL Script* → `nexfit.sql`.
+- **phpMyAdmin**: pestaña _Importar_ → seleccionar `nexfit.sql` → _Continuar_.
+- **MySQL Workbench / DBeaver**: _File → Run SQL Script_ → `nexfit.sql`.
 
 El script se puede ejecutar varias veces: elimina y vuelve a crear las tablas,
 así que siempre deja la base de datos en el mismo estado.
 
 ### Tablas
 
-| Tabla | Contenido |
-| --- | --- |
-| `categories` | 6 disciplinas deportivas (fitness, running, athleisure, fútbol, crossfit, outdoor) |
-| `products` | Catálogo. `id` es el SKU que ya usa la API (`nex-01`…), `badge_tone` guarda el significado del distintivo (sin CSS), `audience` alimenta el menú Hombre/Mujer |
-| `product_sizes` | Tallas con stock y orden de presentación |
-| `product_colors` | Muestras de color; `has_border` marca los tonos claros que necesitan borde |
-| `users` | Cuentas. `password_hash` en formato `sal:hash` (scrypt) |
-| `sessions` | Tokens Bearer (32 bytes en hexadecimal) con caducidad opcional |
-| `favorites` | Favoritos por usuario (el corazón de la cabecera) |
-| `carts` / `cart_items` | Cesta de usuario o invitado, con el precio congelado por línea |
-| `newsletter_subscribers` | Altas del Club NEXFIT |
-| `orders` / `order_items` | Pedidos y su histórico (copia de nombre, talla y precio) |
+| Tabla                    | Contenido                                                                                                                                                     |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `categories`             | 6 disciplinas deportivas (fitness, running, athleisure, fútbol, crossfit, outdoor)                                                                            |
+| `products`               | Catálogo. `id` es el SKU que ya usa la API (`nex-01`…), `badge_tone` guarda el significado del distintivo (sin CSS), `audience` alimenta el menú Hombre/Mujer |
+| `product_sizes`          | Tallas con stock y orden de presentación                                                                                                                      |
+| `product_colors`         | Muestras de color; `has_border` marca los tonos claros que necesitan borde                                                                                    |
+| `users`                  | Cuentas. `password_hash` en formato `sal:hash` (scrypt)                                                                                                       |
+| `sessions`               | Tokens Bearer (32 bytes en hexadecimal) con caducidad opcional                                                                                                |
+| `favorites`              | Favoritos por usuario (el corazón de la cabecera)                                                                                                             |
+| `carts` / `cart_items`   | Cesta de usuario o invitado, con el precio congelado por línea                                                                                                |
+| `newsletter_subscribers` | Altas del Club NEXFIT                                                                                                                                         |
+| `orders` / `order_items` | Pedidos y su histórico (copia de nombre, talla y precio)                                                                                                      |
 
 **Vistas**: `v_catalog` (producto + categoría + tallas + colores + stock en una
 fila, lista para pintar la parrilla) y `v_cart_totals` (líneas, unidades y
@@ -300,18 +325,18 @@ SELECT id, name, email, password_hash FROM users WHERE email = 'demo@nexfit.es';
 
 ### Relación con el código
 
-La demo sigue funcionando **sin base de datos**: el backend guarda todo en
-memoria (`backend/src/data` y `backend/src/services`). El script documenta el
-modelo definitivo y sus relaciones, y sirve de base para conectar la API cuando
-se quiera persistencia:
+El backend **ya usa esta base de datos para todo**: el catálogo sale de
+`v_catalog`, las cuentas de `users`, las sesiones de `sessions`, el carrito de
+`carts`/`cart_items`, los favoritos de `favorites` y el Club de
+`newsletter_subscribers`. No queda ningún dato de negocio en memoria.
 
-| Servicio actual | Sustituto en la base de datos |
-| --- | --- |
-| `data/products.ts`, `data/categories.ts` | `products`, `categories`, `product_sizes`, `product_colors` (o la vista `v_catalog`) |
-| `services/auth.service.ts` | `users` + `sessions` |
-| `services/cart.service.ts` | `carts` + `cart_items` |
-| `services/newsletter.service.ts` | `newsletter_subscribers` |
-| Favoritos de la interfaz | `favorites` |
+| Servicio                         | Tablas / vistas                                      |
+| -------------------------------- | ---------------------------------------------------- |
+| `services/product.service.ts`    | `v_catalog`, `product_colors`, `categories`          |
+| `services/auth.service.ts`       | `users` + `sessions`                                 |
+| `services/cart.service.ts`       | `carts` + `cart_items` (+ `products` para el precio) |
+| `services/favorites.service.ts`  | `favorites`                                          |
+| `services/newsletter.service.ts` | `newsletter_subscribers`                             |
 
 Los datos transaccionales de ejemplo (2 favoritos, 1 cesta con 2 líneas y 1
 pedido entregado) están en la sección 8 del script, marcada como opcional: si
@@ -321,11 +346,11 @@ prefieres empezar con las tablas vacías, borra ese bloque antes de importar.
 
 El proyecto se levanta completo con Docker Compose: base de datos, API y tienda.
 
-| Servicio | Imagen | Puerto en tu equipo | Qué hace |
-| --- | --- | --- | --- |
-| `db` | `mysql:8.0` | `3307` → 3306 | MySQL con `nexfit.sql` cargado en el primer arranque |
-| `backend` | Node 22 (build propio) | `4000` | API Express compilada con `tsc` |
-| `frontend` | Nginx 1.27 (build propio) | `8080` | React compilado + proxy `/api` → backend |
+| Servicio   | Imagen                    | Puerto en tu equipo | Qué hace                                             |
+| ---------- | ------------------------- | ------------------- | ---------------------------------------------------- |
+| `db`       | `mysql:8.0`               | `3307` → 3306       | MySQL con `nexfit.sql` cargado en el primer arranque |
+| `backend`  | Node 22 (build propio)    | `4000`              | API Express compilada con `tsc`                      |
+| `frontend` | Nginx 1.27 (build propio) | `8080`              | React compilado + proxy `/api` → backend             |
 
 ### Arrancar
 
@@ -361,10 +386,11 @@ docker compose down -v            # parar y borrar el volumen de MySQL
   (copia `.env.example`) sin tocar el compose.
 - **Contraseñas**: los valores del compose son de práctica. Cámbialos en `.env`
   antes de publicar el proyecto.
-- **Backend y base de datos**: la API sigue usando los datos en memoria; el
-  contenedor `db` ya está listo y el backend recibe `DB_HOST`, `DB_PORT`,
-  `DB_NAME`, `DB_USER` y `DB_PASSWORD` por variables de entorno para poder
-  conectarlo sin tocar el compose.
+- **Backend y base de datos**: la API espera a que `db` esté `healthy`
+  (`depends_on: condition: service_healthy`) y se conecta con `DB_HOST=db`,
+  `DB_PORT=3306`, `DB_NAME`, `DB_USER` y `DB_PASSWORD`. Todo lo que haces en la
+  tienda (registro, sesión, carrito, favoritos, newsletter) queda escrito en
+  MySQL y sobrevive a reinicios; puedes verlo en DBeaver con `F5`.
 - **Desarrollo local**: `npm run dev` ocupa el puerto 4000, igual que el
   contenedor del backend. Para usar el servidor de Vite con recarga en caliente,
   para primero los contenedores (`docker compose stop backend`) o cambia

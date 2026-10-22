@@ -59,7 +59,7 @@ export function Header({
   // Luna (pasar a oscuro) cuando está claro, sol (pasar a claro) cuando está oscuro.
   const themeIcon = theme === "dark" ? "light_mode" : "dark_mode";
   const [menuOpen, setMenuOpen] = useState(false);
-  
+
   // Escape cierra el menú de navegación desplegable.
   useEffect(() => {
     if (!menuOpen) return;

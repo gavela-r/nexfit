@@ -1,9 +1,12 @@
 // services/auth.service.ts
-// Registro, inicio de sesión y sesiones en memoria (demo).
-// En producción se sustituiría por una base de datos y tokens firmados sin
-// cambiar la interfaz de este servicio.
+// Registro, inicio de sesión y sesiones persistidas en MySQL.
+//   · users    → cuentas (password_hash con scrypt, nunca en claro)
+//   · sessions → token Bearer de 32 bytes en hexadecimal
 import { randomBytes } from "node:crypto";
-import type { AuthPayload, UserRecord, UserView } from "../types/user";
+import type { RowDataPacket } from "mysql2";
+import { run, rows } from "../db/pool";
+import { isDuplicateEntry } from "../db/errors";
+import type { AuthPayload, UserView } from "../types/user";
 import { ApiError } from "../utils/ApiError";
 import { hashPassword, verifyPassword } from "../utils/password";
 
@@ -18,28 +21,46 @@ export interface RegisterInput {
   password: string;
 }
 
-const usersById = new Map<string, UserRecord>();
-const userIdByEmail = new Map<string, string>();
-const userIdByToken = new Map<string, string>();
+interface UserRow extends RowDataPacket {
+  id: string;
+  name: string;
+  email: string;
+  password_hash: string;
+  created_at: Date | string;
+}
+
+interface SessionUserRow extends RowDataPacket {
+  id: string;
+  name: string;
+  email: string;
+  created_at: Date | string;
+  expires_at: Date | string | null;
+}
 
 /** Vista pública: jamás se devuelve el hash de la contraseña. */
-function toView(user: UserRecord): UserView {
+function toView(row: {
+  id: string;
+  name: string;
+  email: string;
+  created_at: Date | string;
+}): UserView {
   return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    createdAt: user.createdAt,
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    createdAt: new Date(row.created_at).toISOString(),
   };
 }
 
-function createSession(userId: string): string {
+/** Crea el token de sesión y lo guarda en la tabla sessions. */
+async function createSession(userId: string): Promise<string> {
   const token = randomBytes(TOKEN_BYTES).toString("hex");
-  userIdByToken.set(token, userId);
+  await run("INSERT INTO sessions (token, user_id) VALUES (?, ?)", [token, userId]);
   return token;
 }
 
 /** Crea la cuenta (409 si el correo ya está registrado) e inicia sesión. */
-export function register(input: RegisterInput): AuthPayload {
+export async function register(input: RegisterInput): Promise<AuthPayload> {
   const name = input.name.trim();
   const email = input.email.trim().toLowerCase();
 
@@ -57,52 +78,86 @@ export function register(input: RegisterInput): AuthPayload {
     throw ApiError.badRequest("Revisa los datos del formulario", problems);
   }
 
-  if (userIdByEmail.has(email)) {
-    throw ApiError.conflict(`Ya existe una cuenta con el correo "${email}"`);
-  }
-
-  const user: UserRecord = {
+  const user = {
     id: `usr-${randomBytes(4).toString("hex")}`,
     name,
     email,
-    createdAt: new Date().toISOString(),
     passwordHash: hashPassword(input.password),
   };
 
-  usersById.set(user.id, user);
-  userIdByEmail.set(email, user.id);
+  try {
+    await run("INSERT INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)", [
+      user.id,
+      user.name,
+      user.email,
+      user.passwordHash,
+    ]);
+  } catch (error) {
+    // La columna email es UNIQUE (y la colación no distingue mayúsculas).
+    if (isDuplicateEntry(error)) {
+      throw ApiError.conflict(`Ya existe una cuenta con el correo "${email}"`);
+    }
+    throw error;
+  }
 
-  return { user: toView(user), token: createSession(user.id) };
+  return { user: toView({ ...user, created_at: new Date() }), token: await createSession(user.id) };
 }
 
 /** Valida credenciales (401 si no coinciden) e inicia sesión. */
-export function login(email: string, password: string): AuthPayload {
-  const user = usersById.get(userIdByEmail.get(email.trim().toLowerCase()) ?? "");
+export async function login(email: string, password: string): Promise<AuthPayload> {
+  const [user] = await rows<UserRow>(
+    `SELECT id, name, email, password_hash, created_at
+       FROM users
+      WHERE email = ? AND is_active = 1
+      LIMIT 1`,
+    [email.trim().toLowerCase()],
+  );
 
   // El mismo mensaje sirve para «correo inexistente» y para «contraseña
   // incorrecta», así no se revela qué correos tienen cuenta.
   const invalidCredentials = ApiError.unauthorized("El correo o la contraseña no son correctos");
 
   if (!user) throw invalidCredentials;
-  if (!verifyPassword(password, user.passwordHash)) throw invalidCredentials;
+  if (!verifyPassword(password, user.password_hash)) throw invalidCredentials;
 
-  return { user: toView(user), token: createSession(user.id) };
+  return { user: toView(user), token: await createSession(user.id) };
 }
 
 /** Cierra la sesión del token (devuelve false si el token ya no existía). */
-export function logout(token?: string): boolean {
-  return token ? userIdByToken.delete(token) : false;
+export async function logout(token?: string): Promise<boolean> {
+  if (!token) return false;
+  const result = await run("DELETE FROM sessions WHERE token = ?", [token]);
+  return result.affectedRows > 0;
 }
 
 /** Usuario de la sesión abierta; lanza 401 si el token no es válido. */
-export function getUserByToken(token?: string): UserView {
-  const userId = token ? userIdByToken.get(token) : undefined;
-  const user = userId ? usersById.get(userId) : undefined;
-  if (!user) throw ApiError.unauthorized("No hay sesión iniciada");
-  return toView(user);
+export async function getUserByToken(token?: string): Promise<UserView> {
+  if (!token) throw ApiError.unauthorized("No hay sesión iniciada");
+
+  const [session] = await rows<SessionUserRow>(
+    `SELECT u.id, u.name, u.email, u.created_at, s.expires_at
+       FROM sessions s
+       JOIN users u ON u.id = s.user_id
+      WHERE s.token = ? AND u.is_active = 1
+      LIMIT 1`,
+    [token],
+  );
+
+  if (!session) throw ApiError.unauthorized("No hay sesión iniciada");
+
+  if (session.expires_at && new Date(session.expires_at).getTime() < Date.now()) {
+    await run("DELETE FROM sessions WHERE token = ?", [token]);
+    throw ApiError.unauthorized("La sesión ha caducado");
+  }
+
+  await run("UPDATE sessions SET last_used_at = NOW() WHERE token = ?", [token]);
+  return toView(session);
 }
 
-/** Cuentas creadas desde que arrancó el servidor. */
-export function countUsers(): number {
-  return usersById.size;
+/** Cuentas registradas en la base de datos. */
+export async function countUsers(): Promise<number> {
+  const [row] = await rows<RowDataPacket & { total: number }>(
+    "SELECT COUNT(*) AS total FROM users",
+  );
+  return Number(row?.total ?? 0);
 }

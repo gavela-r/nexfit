@@ -3,6 +3,7 @@
 import { Router } from "express";
 import { authRouter } from "./auth.routes";
 import { cartRouter } from "./cart.routes";
+import { favoritesRouter } from "./favorites.routes";
 import { healthRouter } from "./health.routes";
 import { newsletterRouter } from "./newsletter.routes";
 import { productRouter } from "./product.routes";
@@ -13,4 +14,5 @@ apiRouter.use(healthRouter);
 apiRouter.use(authRouter);
 apiRouter.use(productRouter);
 apiRouter.use(cartRouter);
+apiRouter.use(favoritesRouter);
 apiRouter.use(newsletterRouter);

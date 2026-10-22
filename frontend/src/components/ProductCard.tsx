@@ -16,12 +16,19 @@ const ADD_BUTTON =
 interface ProductCardProps {
   product: Product;
   onAddToCart: (item: CartItemInput) => void;
+  /** Si el producto está en favoritos (tabla `favorites`). */
+  favorited: boolean;
+  onToggleFavorite: (productId: string) => void;
 }
 
-export function ProductCard({ product, onAddToCart }: ProductCardProps) {
+export function ProductCard({
+  product,
+  onAddToCart,
+  favorited,
+  onToggleFavorite,
+}: ProductCardProps) {
   const [size, setSize] = useState(product.defaultSize);
   const [colorIndex, setColorIndex] = useState(0);
-  const [favorite, setFavorite] = useState(product.favorited);
   const [added, setAdded] = useState(false);
 
   const handleAdd = () => {
@@ -44,16 +51,16 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
           <span className={product.badge.className}>{product.badge.label}</span>
           <button
             type="button"
-            aria-label={favorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-            aria-pressed={favorite}
-            onClick={() => setFavorite((current) => !current)}
+            aria-label={favorited ? "Quitar de favoritos" : "Añadir a favoritos"}
+            aria-pressed={favorited}
+            onClick={() => onToggleFavorite(product.id)}
             className={`absolute top-3.5 right-3.5 z-10 w-9 h-9 rounded-full bg-white/90 dark:bg-slate-900/90 hover:bg-white flex items-center justify-center shadow-sm transition-transform active:scale-90 cursor-pointer ${
-              favorite ? "text-primary" : "text-slate-700 dark:text-slate-200 hover:text-primary"
+              favorited ? "text-primary" : "text-slate-700 dark:text-slate-200 hover:text-primary"
             }`}
           >
             <span
               className="material-symbols-outlined text-[20px]"
-              style={favorite ? { fontVariationSettings: "'FILL' 1" } : undefined}
+              style={favorited ? { fontVariationSettings: "'FILL' 1" } : undefined}
             >
               favorite
             </span>

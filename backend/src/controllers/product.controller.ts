@@ -1,5 +1,6 @@
 // controllers/product.controller.ts
 import type { Request, Response } from "express";
+import { optionalUser } from "../middlewares/auth";
 import * as service from "../services/product.service";
 import type { ProductSort } from "../services/product.service";
 import { respond } from "../utils/respond";
@@ -19,22 +20,23 @@ function asSort(value: unknown): ProductSort | undefined {
 
 /** GET /api/products */
 export async function list(req: Request, res: Response): Promise<void> {
+  const user = await optionalUser(req);
   const filters: service.ProductFilters = {
     category: asText(req.query.category),
     search: asText(req.query.search),
     sort: asSort(req.query.sort) ?? "rating",
   };
 
-  respond(res, service.listProducts(filters));
+  respond(res, await service.listProducts(filters, user?.id));
 }
 
 /** GET /api/products/:id */
 export async function getOne(req: Request, res: Response): Promise<void> {
-  const product = service.getProduct(req.params.id);
-  respond(res, product);
+  const user = await optionalUser(req);
+  respond(res, await service.getProduct(req.params.id, user?.id));
 }
 
 /** GET /api/categories */
 export async function categories(_req: Request, res: Response): Promise<void> {
-  respond(res, service.listCategories());
+  respond(res, await service.listCategories());
 }

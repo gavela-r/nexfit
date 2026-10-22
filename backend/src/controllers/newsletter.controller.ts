@@ -1,8 +1,8 @@
 // controllers/newsletter.controller.ts
 import type { Request, Response } from "express";
 import * as service from "../services/newsletter.service";
-import { respond } from "../utils/respond";
 import { ApiError } from "../utils/ApiError";
+import { respond } from "../utils/respond";
 
 /** POST /api/newsletter/subscribe */
 export async function subscribe(req: Request, res: Response): Promise<void> {
@@ -12,7 +12,7 @@ export async function subscribe(req: Request, res: Response): Promise<void> {
     throw ApiError.badRequest("Falta el campo email");
   }
 
-  const { subscriber, alreadySubscribed } = service.subscribe(email);
+  const { subscriber, alreadySubscribed } = await service.subscribe(email);
 
   respond(
     res,
@@ -29,5 +29,5 @@ export async function subscribe(req: Request, res: Response): Promise<void> {
 
 /** GET /api/newsletter/stats */
 export async function stats(_req: Request, res: Response): Promise<void> {
-  respond(res, { subscribers: service.countSubscribers() });
+  respond(res, { subscribers: await service.countSubscribers() });
 }

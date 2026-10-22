@@ -1,5 +1,5 @@
 // api/index.ts
-// Cliente HTTP contra el backend NEXFIT (Express + TypeScript).
+// Cliente HTTP contra el backend NEXFIT (Express + TypeScript + MySQL).
 // Si la API no está disponible, el frontend sigue funcionando con los datos
 // locales del catálogo para no dejar la tienda en blanco.
 import { products as localProducts, type Product } from "../data/products";
@@ -7,11 +7,32 @@ import { matchesQuery } from "../utils/search";
 
 const API_BASE = String(import.meta.env.VITE_API_URL ?? "").replace(/\/+$/, "");
 
+/** Token del carrito de invitado (lo genera el backend en la primera visita). */
+const CART_TOKEN_KEY = "nexfit_cart_token";
+
 export interface CartItemInput {
   productId: string;
   size: string;
   color: string;
   quantity: number;
+}
+
+export interface CartItemView extends CartItemInput {
+  unitPrice: number;
+  name?: string;
+  image?: string;
+}
+
+export interface CartView {
+  items: CartItemView[];
+  count: number;
+  total: number;
+  cartToken: string | null;
+}
+
+export interface FavoritesView {
+  productIds: string[];
+  count: number;
 }
 
 export interface ApiResponse<T> {
@@ -68,6 +89,88 @@ async function request<T>(path: string, init: RequestInitWithToken = {}): Promis
   return body.data;
 }
 
+// --------------------------------------------------------------- Carrito
+
+/** Token de la cesta de invitado guardado en el navegador. */
+export function getGuestCartToken(): string | null {
+  return window.localStorage.getItem(CART_TOKEN_KEY);
+}
+
+function forgetGuestCartToken(): void {
+  window.localStorage.removeItem(CART_TOKEN_KEY);
+}
+
+/**
+ * Petición de carrito: añade el token de invitado y guarda el que devuelve el
+ * backend la primera vez (así el invitado conserva su cesta entre recargas).
+ */
+async function cartRequest<T>(path: string, init: RequestInitWithToken = {}): Promise<T> {
+  const guestToken = getGuestCartToken();
+  const data = await request<T>(path, {
+    ...init,
+    headers: {
+      ...(guestToken ? { "X-Cart-Token": guestToken } : {}),
+      ...init.headers,
+    },
+  });
+
+  const returnedToken = (data as { cartToken?: string | null } | null)?.cartToken;
+  if (returnedToken) window.localStorage.setItem(CART_TOKEN_KEY, returnedToken);
+
+  return data;
+}
+
+/** Carrito actual del usuario (o del invitado). */
+export async function getCart(token?: string): Promise<CartView> {
+  return cartRequest<CartView>("/cart", { token });
+}
+
+/** Añade una línea al carrito del backend (optimista en la interfaz). */
+export async function addCartItem(item: CartItemInput, token?: string): Promise<CartView> {
+  return cartRequest<CartView>("/cart/items", {
+    method: "POST",
+    body: JSON.stringify(item),
+    token,
+  });
+}
+
+/** Quita un producto del carrito. */
+export async function removeCartItem(productId: string, token?: string): Promise<CartView> {
+  return cartRequest<CartView>(`/cart/items/${encodeURIComponent(productId)}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+/** Vacía el carrito. */
+export async function clearCart(token?: string): Promise<CartView> {
+  return cartRequest<CartView>("/cart", { method: "DELETE", token });
+}
+
+// -------------------------------------------------------------- Favoritos
+
+/** Productos favoritos del usuario (requiere sesión). */
+export async function getFavorites(token: string): Promise<FavoritesView> {
+  return request<FavoritesView>("/favorites", { token });
+}
+
+export async function addFavorite(token: string, productId: string): Promise<FavoritesView> {
+  return request<FavoritesView>("/favorites", {
+    method: "POST",
+    body: JSON.stringify({ productId }),
+    token,
+  });
+}
+
+export async function removeFavorite(token: string, productId: string): Promise<FavoritesView> {
+  return request<FavoritesView>(`/favorites/${encodeURIComponent(productId)}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+// --------------------------------------------------------------- Catálogo
+
 /** Catálogo completo (con respaldo local si el backend está apagado). */
 export async function getProducts(signal?: AbortSignal): Promise<Product[]> {
   try {
@@ -98,14 +201,6 @@ export async function searchProducts(query: string, signal?: AbortSignal): Promi
   }
 }
 
-/** Añade una línea al carrito del backend (optimista en la interfaz). */
-export async function addCartItem(item: CartItemInput): Promise<void> {
-  await request<{ count: number; total: number }>("/cart/items", {
-    method: "POST",
-    body: JSON.stringify(item),
-  });
-}
-
 // -------------------------------------------------------------- Autenticación
 
 export interface AuthUser {
@@ -120,24 +215,38 @@ export interface AuthSession {
   token: string;
 }
 
-/** Crea la cuenta e inicia sesión (201). Lanza ApiRequestError si el correo ya existe. */
+/**
+ * Crea la cuenta e inicia sesión (201). Si hay una cesta de invitado, sus
+ * líneas pasan a la cuenta. Lanza ApiRequestError si el correo ya existe.
+ */
 export async function registerUser(
   name: string,
   email: string,
   password: string,
 ): Promise<AuthSession> {
-  return request<AuthSession>("/auth/register", {
+  const guestToken = getGuestCartToken();
+  const session = await request<AuthSession>("/auth/register", {
     method: "POST",
-    body: JSON.stringify({ name, email, password }),
+    body: JSON.stringify({
+      name,
+      email,
+      password,
+      ...(guestToken ? { cartToken: guestToken } : {}),
+    }),
   });
+  forgetGuestCartToken();
+  return session;
 }
 
 /** Inicia sesión (200). Lanza ApiRequestError con el mensaje del backend. */
 export async function loginUser(email: string, password: string): Promise<AuthSession> {
-  return request<AuthSession>("/auth/login", {
+  const guestToken = getGuestCartToken();
+  const session = await request<AuthSession>("/auth/login", {
     method: "POST",
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, ...(guestToken ? { cartToken: guestToken } : {}) }),
   });
+  forgetGuestCartToken();
+  return session;
 }
 
 /** Cierra la sesión del token en el servidor. */
@@ -150,7 +259,7 @@ export async function getSessionUser(token: string): Promise<AuthUser> {
   return request<AuthUser>("/auth/me", { token });
 }
 
-/** Comprueba que la API esté viva (usado en la barra de estado). */
+/** Comprueba que la API está viva (usado en la barra de estado). */
 export async function getHealth(): Promise<{ status: string; uptime: number }> {
   return request<{ status: string; uptime: number }>("/health");
 }

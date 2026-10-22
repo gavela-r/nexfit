@@ -40,6 +40,9 @@ export interface CartItem {
   quantity: number;
   /** Precio unitario congelado al añadir la línea. */
   unitPrice: number;
+  /** Datos de apoyo para pintar el carrito (los añade el servicio desde products). */
+  name?: string;
+  image?: string;
 }
 
 export interface NewsletterSubscriber {
