@@ -3,7 +3,7 @@
 // con filtro por categoría, búsqueda y ordenación.
 import type { RowDataPacket } from "mysql2";
 import { rows } from "../db/pool";
-import type { Category, Product, ProductColor } from "../types/product";
+import type { Audience, Category, Product, ProductColor } from "../types/product";
 import { ApiError } from "../utils/ApiError";
 
 export type ProductSort = "rating" | "price-asc" | "price-desc";
@@ -13,6 +13,8 @@ export interface ProductFilters {
   category?: string;
   /** Búsqueda por nombre o categoría. */
   search?: string;
+  /** Público objetivo (página Hombre / Mujer). */
+  audience?: Audience;
   sort?: ProductSort;
 }
 
@@ -34,6 +36,7 @@ const BORDER_CLASS = "border border-slate-300";
 interface CatalogRow extends RowDataPacket {
   id: string;
   name: string;
+  category_slug: string;
   category_label: string;
   rating: number;
   badge_label: string | null;
@@ -43,6 +46,12 @@ interface CatalogRow extends RowDataPacket {
   sizes: string | null;
   price: number;
   original_price: number | null;
+  audience: Audience;
+  garment_type: string | null;
+  /** Columna SET de MySQL: llega como "ripstop,dwr". */
+  features: string | null;
+  subtitle: string | null;
+  description: string | null;
   favorited: number;
 }
 
@@ -77,6 +86,7 @@ function toProduct(row: CatalogRow, colors: Map<string, ProductColor[]>): Produc
     id: row.id,
     name: row.name,
     category: row.category_label,
+    categorySlug: row.category_slug,
     rating: Number(row.rating),
     badge: {
       label: row.badge_label ?? "",
@@ -89,6 +99,11 @@ function toProduct(row: CatalogRow, colors: Map<string, ProductColor[]>): Produc
     colors: colors.get(row.id) ?? [],
     price: Number(row.price),
     ...(row.original_price !== null ? { originalPrice: Number(row.original_price) } : {}),
+    audience: row.audience,
+    ...(row.garment_type ? { garmentType: row.garment_type } : {}),
+    features: (row.features ?? "").split(",").filter(Boolean),
+    ...(row.subtitle ? { subtitle: row.subtitle } : {}),
+    ...(row.description ? { description: row.description } : {}),
   };
 }
 
@@ -108,13 +123,18 @@ export async function listProducts(
   filters: ProductFilters = {},
   userId?: string,
 ): Promise<Product[]> {
-  const { category, search, sort = "rating" } = filters;
+  const { category, search, audience, sort = "rating" } = filters;
   const conditions: string[] = [];
   const params: unknown[] = [userId ?? null];
 
   if (category) {
     conditions.push("(v.category_slug = ? OR v.category_label LIKE CONCAT('%', ?, '%'))");
     params.push(category, category);
+  }
+
+  if (audience) {
+    conditions.push("v.audience = ?");
+    params.push(audience);
   }
 
   if (search) {

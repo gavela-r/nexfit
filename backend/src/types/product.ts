@@ -16,6 +16,8 @@ export interface Product {
   id: string;
   name: string;
   category: string;
+  /** Slug de la categoría (futbol, running...), para filtrar sin depender del texto. */
+  categorySlug: string;
   rating: number;
   badge: ProductBadge;
   image: string;
@@ -25,7 +27,17 @@ export interface Product {
   colors: ProductColor[];
   price: number;
   originalPrice?: number;
+  /** Público objetivo (hombre, mujer o unisex). */
+  audience: Audience;
+  /** Tipo de prenda (camiseta, pantalon...), para los filtros del catálogo. */
+  garmentType?: string;
+  /** Propiedades técnicas: compresion, ripstop, dwr, antiabrasion. */
+  features: string[];
+  subtitle?: string;
+  description?: string;
 }
+
+export type Audience = "hombre" | "mujer" | "unisex";
 
 export interface Category {
   slug: string;

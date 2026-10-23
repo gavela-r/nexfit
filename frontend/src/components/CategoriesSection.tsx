@@ -54,7 +54,7 @@ export function CategoriesSection() {
           {/* 2. Running */}
           <a
             className="group relative rounded-2xl overflow-hidden aspect-[4/5] bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-end p-4 hover:shadow-lg transition-all"
-            href="#running"
+            href="#/running"
           >
             <div
               className="absolute inset-0 bg-cover bg-center group-hover:scale-110 transition-transform duration-500 ease-out opacity-85"
@@ -73,7 +73,7 @@ export function CategoriesSection() {
           {/* 3. Athleisure / Casual */}
           <a
             className="group relative rounded-2xl overflow-hidden aspect-[4/5] bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-end p-4 hover:shadow-lg transition-all"
-            href="#athleisure"
+            href="#/athleisure"
           >
             <div
               className="absolute inset-0 bg-cover bg-center group-hover:scale-110 transition-transform duration-500 ease-out opacity-85"
@@ -92,7 +92,7 @@ export function CategoriesSection() {
           {/* 4. Fútbol */}
           <a
             className="group relative rounded-2xl overflow-hidden aspect-[4/5] bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-end p-4 hover:shadow-lg transition-all"
-            href="#futbol"
+            href="#/futbol"
           >
             <div
               className="absolute inset-0 bg-cover bg-center group-hover:scale-110 transition-transform duration-500 ease-out opacity-85"
