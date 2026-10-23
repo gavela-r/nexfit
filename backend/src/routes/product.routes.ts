@@ -5,7 +5,7 @@ import { asyncHandler } from "../utils/asyncHandler";
 
 export const productRouter = Router();
 
-/** GET /api/products?category=&search=&sort=rating|price-asc|price-desc */
+/** GET /api/products?category=&search=&audience=hombre|mujer|unisex&sort=rating|price-asc|price-desc */
 productRouter.get("/products", asyncHandler(list));
 
 /** GET /api/products/:id */

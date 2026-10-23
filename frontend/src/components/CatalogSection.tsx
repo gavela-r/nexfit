@@ -1,10 +1,14 @@
 // CatalogSection
-// Rejilla de productos con filtros de categoría y carga desde el backend.
+// Rejilla de productos destacados de la portada (máximo HOME_LIMIT) con filtros de
+// categoría y carga desde el backend; «Ver todos los productos» abre #/catalogo.
 import { useEffect, useMemo, useState } from "react";
 import { getProducts, type CartItemInput } from "../api";
 import { products as localProducts, type Product } from "../data/products";
 import { matchesQuery } from "../utils/search";
 import { ProductCard } from "./ProductCard";
+
+/** Productos que se muestran en la portada; el resto, en el catálogo completo. */
+const HOME_LIMIT = 6;
 
 const FILTERS = ["Más Vendidos", "Novedades", "Entrenamiento", "Running"] as const;
 type Filter = (typeof FILTERS)[number];
@@ -71,6 +75,8 @@ export function CatalogSection({
     );
   }, [items, filter, query]);
 
+  const featured = visible.slice(0, HOME_LIMIT);
+
   const resetCatalog = () => {
     setFilter(FILTERS[0]);
     onQueryChange("");
@@ -94,7 +100,7 @@ export function CatalogSection({
             <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
               {source === "api" ? "Sincronizado con la API NEXFIT" : "Catálogo local de respaldo"}
               {" · "}
-              {visible.length} de {items.length} productos
+              {featured.length} de {items.length} productos
             </p>
           </div>
 
@@ -144,9 +150,9 @@ export function CatalogSection({
         </div>
 
         {/* Cards Grid */}
-        {visible.length > 0 ? (
+        {featured.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-            {visible.map((product) => (
+            {featured.map((product) => (
               <ProductCard
                 key={product.id}
                 product={product}
@@ -172,6 +178,16 @@ export function CatalogSection({
             </button>
           </div>
         )}
+
+        <div className="mt-10 flex justify-center">
+          <a
+            href="#/catalogo"
+            className="h-12 px-7 rounded-xl bg-slate-900 dark:bg-primary hover:bg-primary dark:hover:bg-primary/90 text-white text-sm font-bold inline-flex items-center gap-2 shadow-sm transition-colors"
+          >
+            Ver todos los productos
+            <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+          </a>
+        </div>
       </section>
     </>
   );

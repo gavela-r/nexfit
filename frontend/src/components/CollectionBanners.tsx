@@ -32,7 +32,7 @@ export function CollectionBanners() {
               <div className="pt-2">
                 <a
                   className="h-10 px-5 rounded-xl bg-white text-slate-900 hover:bg-slate-100 font-bold text-xs inline-flex items-center gap-2 shadow-sm transition-all"
-                  href="#catalogo"
+                  href="#/hombre"
                 >
                   <span className="">Ver Colección</span>
                   <span className="material-symbols-outlined text-[16px]" data-icon="north_east">
@@ -68,7 +68,7 @@ export function CollectionBanners() {
               <div className="pt-2">
                 <a
                   className="h-10 px-5 rounded-xl bg-white text-slate-900 hover:bg-slate-100 font-bold text-xs inline-flex items-center gap-2 shadow-sm transition-all"
-                  href="#catalogo"
+                  href="#/mujer"
                 >
                   <span className="">Ver Colección</span>
                   <span className="material-symbols-outlined text-[16px]" data-icon="north_east">

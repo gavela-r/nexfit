@@ -4,8 +4,11 @@
 // los textos de los botones se ocultan por tramos para que nada se salga.
 import { useEffect, useState } from "react";
 import type { AuthUser } from "../api";
+import type { Page } from "../hooks/useHashRoute";
 
 interface HeaderProps {
+  /** Página visible, para marcar su enlace como activo. */
+  currentPage: Page;
   theme: "light" | "dark";
   onToggleTheme: () => void;
   cartCount: number;
@@ -23,16 +26,18 @@ interface HeaderProps {
   onLogout: () => void;
 }
 
-const NAV_LINKS = [
-  { href: "#hombre", label: "Hombre" },
-  { href: "#mujer", label: "Mujer" },
+const NAV_LINKS: { href: string; label: string; page?: Page }[] = [
+  { href: "#/futbol", label: "Fútbol", page: "futbol" },
+  { href: "#/hombre", label: "Hombre", page: "hombre" },
+  { href: "#/mujer", label: "Mujer", page: "mujer" },
   { href: "#fitness", label: "Fitness/Gym" },
-  { href: "#running", label: "Running" },
-  { href: "#athleisure", label: "Athleisure" },
-] as const;
+  { href: "#/running", label: "Running", page: "running" },
+  { href: "#/athleisure", label: "Athleisure", page: "athleisure" },
+];
 
 const NAV_LINK_CLASS =
   "text-slate-600 dark:text-slate-300 hover:text-primary dark:hover:text-primary text-sm font-semibold transition-colors pb-1";
+const NAV_LINK_ACTIVE = "text-primary text-sm font-bold border-b-2 border-primary pb-1";
 
 /** Iniciales del usuario para el avatar (máximo dos letras). */
 function getInitials(name: string): string {
@@ -45,6 +50,7 @@ function getInitials(name: string): string {
 }
 
 export function Header({
+  currentPage,
   theme,
   onToggleTheme,
   cartCount,
@@ -111,13 +117,23 @@ export function Header({
 
           {/* Navigation Links (escritorio ancho) */}
           <nav className="hidden xl:flex items-center gap-4 2xl:gap-6">
-            {NAV_LINKS.map((link) => (
-              <a className={NAV_LINK_CLASS} href={link.href} key={link.href}>
-                {link.label}
-              </a>
-            ))}
+            {NAV_LINKS.map((link) => {
+              const active = link.page !== undefined && link.page === currentPage;
+              return (
+                <a
+                  aria-current={active ? "page" : undefined}
+                  className={active ? NAV_LINK_ACTIVE : NAV_LINK_CLASS}
+                  href={link.href}
+                  key={link.href}
+                >
+                  {link.label}
+                </a>
+              );
+            })}
             <a
-              className="text-primary font-bold text-sm border-b-2 border-primary pb-1 flex items-center gap-1.5"
+              className={`text-primary font-bold text-sm pb-1 flex items-center gap-1.5 ${
+                currentPage === "home" ? "border-b-2 border-primary" : ""
+              }`}
               href="#catalogo"
             >
               Ofertas
@@ -282,7 +298,12 @@ export function Header({
             <nav className="max-w-[1320px] mx-auto px-4 sm:px-6 md:px-8 py-3 flex flex-col">
               {NAV_LINKS.map((link) => (
                 <a
-                  className="py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:text-primary transition-colors border-b border-slate-100 dark:border-slate-800"
+                  aria-current={link.page === currentPage ? "page" : undefined}
+                  className={`py-2.5 text-sm font-semibold hover:text-primary transition-colors border-b border-slate-100 dark:border-slate-800 ${
+                    link.page === currentPage
+                      ? "text-primary"
+                      : "text-slate-700 dark:text-slate-200"
+                  }`}
                   href={link.href}
                   key={link.href}
                   onClick={closeMenu}

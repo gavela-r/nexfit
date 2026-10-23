@@ -56,7 +56,7 @@ export function BeginnerGuide() {
               </div>
               <a
                 className="text-secondary dark:text-blue-400 hover:text-primary text-xs font-bold inline-flex items-center gap-1 pt-2 border-t border-slate-100 dark:border-slate-700"
-                href="#athleisure"
+                href="#/athleisure"
               >
                 <span className="">Ver prendas suaves recomendadas</span>
                 <span className="material-symbols-outlined text-[16px]" data-icon="arrow_forward">
@@ -118,7 +118,7 @@ export function BeginnerGuide() {
               </div>
               <a
                 className="text-secondary dark:text-blue-400 hover:text-primary text-xs font-bold inline-flex items-center gap-1 pt-2 border-t border-slate-100 dark:border-slate-700"
-                href="#running"
+                href="#/running"
               >
                 <span className="">Ver ropa para aire libre</span>
                 <span className="material-symbols-outlined text-[16px]" data-icon="arrow_forward">

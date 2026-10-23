@@ -29,14 +29,61 @@ import { SupportBanner } from "./components/SupportBanner";
 import { TechBanner } from "./components/TechBanner";
 import { Toast, type ToastData } from "./components/Toast";
 import { TrustBar } from "./components/TrustBar";
+import { CollectionCatalogPage } from "./components/CollectionCatalogPage";
+import {
+  ALL_CATALOG,
+  ATHLEISURE_CATALOG,
+  FOOTBALL_CATALOG,
+  MEN_CATALOG,
+  RUNNING_CATALOG,
+  WOMEN_CATALOG,
+  type CatalogConfig,
+} from "./data/catalogs";
 import { useAuth } from "./hooks/useAuth";
+import { useHashRoute, type Page } from "./hooks/useHashRoute";
 import { useTheme } from "./hooks/useTheme";
 
 type AuthTab = "login" | "register";
 
+/** Páginas de catálogo y la configuración que pinta cada una. */
+const CATALOG_PAGES: Partial<Record<Page, CatalogConfig>> = {
+  hombre: MEN_CATALOG,
+  mujer: WOMEN_CATALOG,
+  futbol: FOOTBALL_CATALOG,
+  running: RUNNING_CATALOG,
+  athleisure: ATHLEISURE_CATALOG,
+  catalogo: ALL_CATALOG,
+};
+
+/** Lleva hasta una sección de la portada (cambiando de página si hace falta). */
+function scrollToSection(id: string) {
+  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 export default function App() {
   const { theme, toggleTheme } = useTheme();
   const { user, token, restoring, login, register, logout } = useAuth();
+  const { page, anchor } = useHashRoute();
+  const catalogConfig = CATALOG_PAGES[page];
+
+  // Al cambiar de página: arriba del todo, o a la sección pedida por el ancla.
+  useEffect(() => {
+    if (page === "home" && anchor) {
+      window.setTimeout(() => scrollToSection(anchor), 0);
+    } else {
+      window.scrollTo({ top: 0, behavior: "instant" });
+    }
+    // Solo al cambiar de página: los anclas dentro de la portada los resuelve el navegador.
+  }, [page]);
+
+  /** Va a una sección de la portada; desde otra página, vuelve antes a la portada. */
+  const goToHomeSection = (id: string) => {
+    if (page !== "home") {
+      window.location.hash = id;
+      return;
+    }
+    window.setTimeout(() => scrollToSection(id), 0);
+  };
   const [cartCount, setCartCount] = useState(0);
   // Panel lateral de la cesta: abierto/cerrado, líneas reales y estado de red.
   const [cartOpen, setCartOpen] = useState(false);
@@ -186,11 +233,10 @@ export default function App() {
   const closeCart = useCallback(() => setCartOpen(false), []);
 
   // «Explorar catálogo» desde la cesta vacía.
+  // En una página de colección se queda allí; en la portada baja al catálogo.
   const handleGoShopping = () => {
     setCartOpen(false);
-    window.setTimeout(() => {
-      document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 100);
+    if (page === "home") window.setTimeout(() => scrollToSection("catalogo"), 100);
   };
 
   // No hay pasarela de pago: el pedido se simula y se avisa.
@@ -225,9 +271,7 @@ export default function App() {
   const handleSelectSearch = (query: string) => {
     setCatalogQuery(query);
     setSearchOpen(false);
-    window.setTimeout(() => {
-      document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 0);
+    goToHomeSection("catalogo");
   };
 
   // Abre el panel de acceso con la pestaña pedida (cierra buscador y cesta).
@@ -271,6 +315,7 @@ export default function App() {
     <div className="min-h-screen flex flex-col w-full min-w-full bg-[#FFFFFF] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100 antialiased font-body-md">
       <AnnouncementBar />
       <Header
+        currentPage={page}
         theme={theme}
         onToggleTheme={toggleTheme}
         cartCount={cartCount}
@@ -284,21 +329,34 @@ export default function App() {
         onLogout={logout}
       />
       <main className="w-full flex-grow">
-        <HeroSection />
-        <CollectionBanners />
-        <CategoriesSection />
-        <BeginnerGuide />
-        <CatalogSection
-          onAddToCart={handleAddToCart}
-          favoriteIds={favoriteIds}
-          onToggleFavorite={handleToggleFavorite}
-          query={catalogQuery}
-          onQueryChange={setCatalogQuery}
-        />
-        <SupportBanner />
-        <TechBanner />
-        <PillarsSection />
-        <TrustBar />
+        {catalogConfig ? (
+          // La key reinicia filtros y página al pasar de una colección a otra.
+          <CollectionCatalogPage
+            key={page}
+            config={catalogConfig}
+            onAddToCart={handleAddToCart}
+            favoriteIds={favoriteIds}
+            onToggleFavorite={handleToggleFavorite}
+          />
+        ) : (
+          <>
+            <HeroSection />
+            <CollectionBanners />
+            <CategoriesSection />
+            <BeginnerGuide />
+            <CatalogSection
+              onAddToCart={handleAddToCart}
+              favoriteIds={favoriteIds}
+              onToggleFavorite={handleToggleFavorite}
+              query={catalogQuery}
+              onQueryChange={setCatalogQuery}
+            />
+            <SupportBanner />
+            <TechBanner />
+            <PillarsSection />
+            <TrustBar />
+          </>
+        )}
       </main>
       <FooterSection />
       <SearchOverlay

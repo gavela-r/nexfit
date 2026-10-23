@@ -95,12 +95,12 @@ export function FooterSection() {
               <h4 className="text-xs font-bold text-white uppercase tracking-wider">Colecciones</h4>
               <ul className="space-y-2 text-xs text-slate-400">
                 <li className="">
-                  <a className="hover:text-primary transition-colors" href="#hombre">
+                  <a className="hover:text-primary transition-colors" href="#/hombre">
                     Hombre
                   </a>
                 </li>
                 <li className="">
-                  <a className="hover:text-primary transition-colors" href="#mujer">
+                  <a className="hover:text-primary transition-colors" href="#/mujer">
                     Mujer
                   </a>
                 </li>
@@ -130,12 +130,12 @@ export function FooterSection() {
                   </a>
                 </li>
                 <li className="">
-                  <a className="hover:text-primary transition-colors" href="#running">
+                  <a className="hover:text-primary transition-colors" href="#/running">
                     Running
                   </a>
                 </li>
                 <li className="">
-                  <a className="hover:text-primary transition-colors" href="#athleisure">
+                  <a className="hover:text-primary transition-colors" href="#/athleisure">
                     Athleisure
                   </a>
                 </li>

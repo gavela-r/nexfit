@@ -2,7 +2,7 @@
 // Cliente HTTP contra el backend NEXFIT (Express + TypeScript + MySQL).
 // Si la API no está disponible, el frontend sigue funcionando con los datos
 // locales del catálogo para no dejar la tienda en blanco.
-import { products as localProducts, type Product } from "../data/products";
+import { products as localProducts, type Audience, type Product } from "../data/products";
 import { matchesQuery } from "../utils/search";
 
 const API_BASE = String(import.meta.env.VITE_API_URL ?? "").replace(/\/+$/, "");
@@ -205,6 +205,25 @@ export async function getProducts(signal?: AbortSignal): Promise<Product[]> {
   } catch {
     return localProducts;
   }
+}
+
+/**
+ * Catálogo de un público concreto (`GET /api/products?audience=hombre`).
+ * Si el backend está apagado (o es anterior y no conoce `audience`) se
+ * filtra la copia local.
+ */
+export async function getProductsByAudience(
+  audience: Audience,
+  signal?: AbortSignal,
+): Promise<Product[]> {
+  try {
+    const products = await request<Product[]>(`/products?audience=${audience}`, { signal });
+    const matching = products.filter((product) => product.audience === audience);
+    if (matching.length > 0) return matching;
+  } catch (error) {
+    if (signal?.aborted) throw error;
+  }
+  return localProducts.filter((product) => product.audience === audience);
 }
 
 /**
