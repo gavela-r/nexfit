@@ -344,6 +344,216 @@ export const FOOTBALL_CATALOG: CatalogConfig = {
   },
 };
 
+/** Ropa de fitness y gimnasio de hombre y mujer (#/fitness): chips por tipo de prenda. */
+export const FITNESS_CATALOG: CatalogConfig = {
+  slug: "fitness",
+  crumb: "Deportes",
+  crumbHref: "#/catalogo",
+  crumbCurrent: "Fitness · Ropa de Gimnasio",
+  categories: ["fitness"],
+  chips: "garments",
+  allChip: "Todos (Hombre y Mujer)",
+  icon: "fitness_center",
+  scope: "de fitness",
+  sizeLegend: "Talla (Hombre / Mujer)",
+  eyebrow: "Colección oficial fitness 2026",
+  title: "Ropa de Fitness & Gym · Fuerza, Soporte y Libertad de Movimiento",
+  intro:
+    "Camisetas transpirables, leggings Squat-Proof, tops de alto soporte y shorts flexibles para musculación, cardio y entrenamiento funcional. Modeladas en 3D con relieve puro de producto.",
+  audiences: [
+    { id: "hombre", label: "Hombre" },
+    { id: "mujer", label: "Mujer" },
+    { id: "unisex", label: "Unisex" },
+  ],
+  disciplines: [],
+  garments: [
+    {
+      id: "camiseta",
+      label: "Camisetas, Tirantes & Crops",
+      chip: "Camisetas y Tirantes",
+    },
+    { id: "top", label: "Tops & Sujetadores Deportivos", chip: "Tops de Alto Soporte" },
+    {
+      id: "compresion",
+      label: "Leggings & Compresión",
+      types: ["compresion", "pantalon"],
+      chip: "Leggings y Joggers",
+    },
+    { id: "short", label: "Shorts de Gimnasio", chip: "Shorts de Gimnasio" },
+    { id: "sudadera", label: "Sudaderas & Hoodies", chip: "Sudaderas y Hoodies" },
+    { id: "accesorio", label: "Guantes & Accesorios", chip: "Accesorios" },
+  ],
+  sizes: ["XS", "S", "M", "L", "XL", "XXL"],
+  colors: [
+    { value: "#111827", label: "Negro" },
+    { value: "#374151", label: "Grafito" },
+    { value: "#FF5A1F", label: "Naranja NEXFIT" },
+    { value: "#1E293B", label: "Azul noche" },
+    { value: "#2563EB", label: "Azul" },
+    { value: "#C4999B", label: "Rosa palo" },
+    { value: "#AE3200", label: "Terracota" },
+  ],
+  features: [
+    { id: "compresion", label: "Compresión anatómica" },
+    { id: "squatproof", label: "Opacidad Squat-Proof 360°" },
+    { id: "cintura_alta", label: "Cintura alta que no se baja" },
+    { id: "dryfit", label: "Tejido transpirable DryFit" },
+    { id: "bolsillos_zip", label: "Bolsillos con cremallera" },
+    { id: "oversize", label: "Corte relajado / Oversize" },
+  ],
+  help: {
+    sizeTitle: "Guía de Tallas Fitness (Hombre y Mujer)",
+    sizeText:
+      "Patronaje atlético pensado para sentadilla, press y peso muerto. Ajustes específicos para morfología masculina y femenina con medidas precisas de contorno y largo.",
+    sizeLink: "Consultar tabla de medidas (cm)",
+    guaranteeTitle: "Garantía Pro-Athlete 30 Días",
+    guaranteeText:
+      "Prendas testadas en sala de musculación, clases dirigidas y Hiit: elasticidad que no cede, costuras planas sin rozaduras y secado ultra rápido.",
+    shippingTitle: "Envíos y Cambios Gratis en 24/48h",
+    shippingText:
+      "Recibe tu equipación en 24/48 horas con entrega exprés garantizada. Cambios de talla gratuitos a domicilio o en puntos de recogida autorizados.",
+  },
+};
+
+/** Ropa de CrossFit y entrenamiento funcional (#/crossfit): chips por tipo de prenda. */
+export const CROSSFIT_CATALOG: CatalogConfig = {
+  slug: "crossfit",
+  crumb: "Deportes",
+  crumbHref: "#/catalogo",
+  crumbCurrent: "CrossFit · Ropa de Entrenamiento",
+  categories: ["crossfit"],
+  chips: "garments",
+  allChip: "Todos (Hombre y Mujer)",
+  icon: "exercise",
+  scope: "de CrossFit",
+  sizeLegend: "Talla (Hombre / Mujer)",
+  eyebrow: "Colección oficial CrossFit 2026",
+  title: "Ropa de CrossFit & Hiit · Resistencia, Agarre y Libertad Total",
+  intro:
+    "Camisetas anti-abrasión, mallas de compresión, shorts Ripstop y tops de alto soporte pensados para WODs, halterofilia y trepas de cuerda. Modeladas en 3D con relieve puro de producto.",
+  audiences: [
+    { id: "hombre", label: "Hombre" },
+    { id: "mujer", label: "Mujer" },
+    { id: "unisex", label: "Unisex" },
+  ],
+  disciplines: [],
+  garments: [
+    {
+      id: "camiseta",
+      label: "Camisetas, Tanks & Tops",
+      types: ["camiseta", "top"],
+      chip: "Camisetas y Tanks",
+    },
+    { id: "compresion", label: "Mallas & Compresión", chip: "Mallas de Compresión" },
+    { id: "short", label: "Shorts de WOD", chip: "Shorts de WOD" },
+    { id: "sudadera", label: "Sudaderas & Calentamiento", chip: "Sudaderas" },
+    { id: "accesorio", label: "Calcetines & Accesorios", chip: "Accesorios" },
+  ],
+  sizes: ["XS", "S", "M", "L", "XL", "XXL"],
+  colors: [
+    { value: "#111827", label: "Negro" },
+    { value: "#374151", label: "Grafito" },
+    { value: "#FF5A1F", label: "Naranja NEXFIT" },
+    { value: "#FFFFFF", label: "Blanco" },
+    { value: "#4B5D3A", label: "Verde oliva" },
+    { value: "#AE3200", label: "Terracota" },
+    { value: "#C4999B", label: "Rosa palo" },
+  ],
+  features: [
+    { id: "antiabrasion", label: "Paneles anti-abrasión" },
+    { id: "compresion", label: "Compresión anatómica" },
+    { id: "dryfit", label: "Tejido transpirable DryFit" },
+    { id: "squatproof", label: "Opacidad Squat-Proof 360°" },
+    { id: "ripstop", label: "Micro-Ripstop anti-desgarro" },
+    { id: "cintura_alta", label: "Cintura alta que no se baja" },
+  ],
+  help: {
+    sizeTitle: "Guía de Tallas CrossFit (Hombre y Mujer)",
+    sizeText:
+      "Patronaje atlético para sentadilla profunda, cleans y burpees. Ajustes específicos para morfología masculina y femenina con medidas precisas de contorno y largo.",
+    sizeLink: "Consultar tabla de medidas (cm)",
+    guaranteeTitle: "Garantía Pro-Athlete 30 Días",
+    guaranteeText:
+      "Prendas testadas en box: roce de la barra, trepas de cuerda y metcons largos sin perder forma, con costuras reforzadas y secado ultra rápido.",
+    shippingTitle: "Envíos y Cambios Gratis en 24/48h",
+    shippingText:
+      "Recibe tu equipación en 24/48 horas con entrega exprés garantizada. Cambios de talla gratuitos a domicilio o en puntos de recogida autorizados.",
+  },
+};
+
+/** Ropa de montaña, trekking y trail (#/outdoor): chips por tipo de prenda. */
+export const OUTDOOR_CATALOG: CatalogConfig = {
+  slug: "outdoor",
+  crumb: "Deportes",
+  crumbHref: "#/catalogo",
+  crumbCurrent: "Outdoor · Montaña y Trekking",
+  categories: ["outdoor"],
+  chips: "garments",
+  allChip: "Todos (Hombre y Mujer)",
+  icon: "landscape",
+  scope: "de outdoor",
+  sizeLegend: "Talla (Hombre / Mujer)",
+  eyebrow: "Colección oficial outdoor 2026",
+  title: "Ropa de Montaña & Trekking · Protección, Abrigo y Ligereza",
+  intro:
+    "Chaquetas impermeables DWR, softshells, pantalones Ripstop de trekking y capas medias para rutas, alta montaña y trail. Modeladas en 3D con relieve puro de producto.",
+  audiences: [
+    { id: "hombre", label: "Hombre" },
+    { id: "mujer", label: "Mujer" },
+    { id: "unisex", label: "Unisex" },
+  ],
+  disciplines: [],
+  garments: [
+    {
+      id: "chaqueta",
+      label: "Chaquetas, Softshells & Chalecos",
+      chip: "Chaquetas y Softshells",
+    },
+    {
+      id: "pantalon",
+      label: "Pantalones & Shorts de Trekking",
+      types: ["pantalon", "short"],
+      chip: "Pantalones de Trekking",
+    },
+    {
+      id: "camiseta",
+      label: "Camisetas & Capas Base",
+      chip: "Camisetas y Capas Base",
+    },
+    { id: "sudadera", label: "Forros Polares & Capas Medias", chip: "Capas Medias" },
+    { id: "accesorio", label: "Bastones & Accesorios", chip: "Accesorios" },
+  ],
+  sizes: ["XS", "S", "M", "L", "XL", "XXL"],
+  colors: [
+    { value: "#4B5D3A", label: "Verde oliva" },
+    { value: "#111827", label: "Negro" },
+    { value: "#374151", label: "Grafito" },
+    { value: "#1E293B", label: "Azul noche" },
+    { value: "#FF5A1F", label: "Naranja NEXFIT" },
+    { value: "#E5E0D8", label: "Arena" },
+    { value: "#AE3200", label: "Terracota" },
+  ],
+  features: [
+    { id: "dwr", label: "Repelente al agua (DWR)" },
+    { id: "ripstop", label: "Micro-Ripstop anti-desgarro" },
+    { id: "antiabrasion", label: "Paneles anti-abrasión" },
+    { id: "antipilling", label: "Tratamiento anti-pilling" },
+    { id: "bolsillos_zip", label: "Bolsillos con cremallera" },
+  ],
+  help: {
+    sizeTitle: "Guía de Tallas Outdoor (Hombre y Mujer)",
+    sizeText:
+      "Patronaje pensado para llevar por capas: base, media y exterior. Te indicamos si conviene subir una talla para usarla sobre un forro polar.",
+    sizeLink: "Consultar tabla de medidas (cm)",
+    guaranteeTitle: "Garantía Pro-Athlete 30 Días",
+    guaranteeText:
+      "Prendas probadas en lluvia, viento y roca: tejidos DWR, costuras termoselladas y refuerzos donde más se desgastan en la ruta.",
+    shippingTitle: "Envíos y Cambios Gratis en 24/48h",
+    shippingText:
+      "Recibe tu equipación antes de tu próxima salida con entrega exprés en 24/48 horas. Cambios de talla gratuitos a domicilio o en puntos de recogida.",
+  },
+};
+
 /** Ropa de running de hombre y mujer (#/running): chips por tipo de prenda. */
 export const RUNNING_CATALOG: CatalogConfig = {
   slug: "running",

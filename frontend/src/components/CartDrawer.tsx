@@ -2,9 +2,9 @@
 // Panel lateral de la cesta: se abre desde el botón del carrito de la cabecera.
 // Muestra las líneas reales del backend (talla, color, cantidad), el progreso
 // hacia el envío gratis, una sugerencia para completar la equipación y el
-// resumen con el descuento del Club antes de tramitar el pedido.
-import { useEffect } from "react";
-import type { CartItemInput, CartItemView, CartView } from "../api";
+// resumen con el descuento (Club o cupón MOVE15) antes de tramitar el pedido.
+import { useEffect, useState, type FormEvent } from "react";
+import type { CartItemInput, CartItemView, CartView, Coupon } from "../api";
 import { products } from "../data/products";
 
 /** Clave única de una línea: mismo producto, talla y color. */
@@ -19,7 +19,7 @@ function money(value: number): string {
 
 const FREE_SHIPPING_FROM = 50;
 const SHIPPING_COST = 4.95;
-const CLUB_DISCOUNT = 0.1;
+const CLUB_DISCOUNT_PERCENT = 10;
 
 const PAYMENT_BADGES = ["APPLE PAY", "VISA", "MASTERCARD", "PAYPAL"];
 
@@ -40,7 +40,14 @@ interface CartDrawerProps {
   onRemove: (item: CartItemView) => void;
   onToggleFavorite: (productId: string) => void;
   onAddUpsell: (item: CartItemInput) => void;
-  onCheckout: (total: number) => void;
+  onCheckout: () => void;
+  /** Creando la sesión de pago de Stripe (bloquea el botón). */
+  checkoutLoading?: boolean;
+  /** Cupón escrito por el usuario (MOVE15); sin él, con sesión se aplica CLUB10. */
+  coupon?: Coupon | null;
+  /** Valida y aplica un código; devuelve el motivo si no vale. */
+  onApplyCoupon: (code: string) => Promise<string | null>;
+  onRemoveCoupon: () => void;
   onViewDetails: () => void;
 }
 
@@ -61,6 +68,10 @@ export function CartDrawer({
   onToggleFavorite,
   onAddUpsell,
   onCheckout,
+  checkoutLoading = false,
+  coupon = null,
+  onApplyCoupon,
+  onRemoveCoupon,
   onViewDetails,
 }: CartDrawerProps) {
   // Escape cierra el panel y, mientras está abierto, la página no hace scroll.
@@ -81,13 +92,30 @@ export function CartDrawer({
     };
   }, [open, onClose]);
 
+  // Campo «¿Tienes un código?»
+  const [couponOpen, setCouponOpen] = useState(false);
+  const [code, setCode] = useState("");
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [applying, setApplying] = useState(false);
+
+  const applyCoupon = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!code.trim()) return;
+    setApplying(true);
+    setCouponError(await onApplyCoupon(code));
+    setApplying(false);
+  };
+
   if (!open) return null;
 
   const items = cart?.items ?? [];
   const count = cart?.count ?? 0;
   const subtotal = cart?.total ?? 0;
 
-  const discount = isAuthenticated ? Math.round(subtotal * CLUB_DISCOUNT * 100) / 100 : 0;
+  // Los descuentos no se acumulan: el cupón escrito sustituye al del Club.
+  // Se calcula en céntimos enteros, igual que el backend, para que coincida con Stripe.
+  const discountPercent = coupon ? coupon.percent : isAuthenticated ? CLUB_DISCOUNT_PERCENT : 0;
+  const discount = Math.round((Math.round(subtotal * 100) * discountPercent) / 100) / 100;
   const shipping = subtotal > 0 && subtotal < FREE_SHIPPING_FROM ? SHIPPING_COST : 0;
   const total = Math.round((subtotal - discount + shipping) * 100) / 100;
 
@@ -412,6 +440,78 @@ export function CartDrawer({
         {/* ----------------------------------------------------------- resumen */}
         {count > 0 && (
           <footer className="shrink-0 border-t border-slate-200 bg-white px-5 pb-4 pt-3 dark:border-slate-800 dark:bg-slate-900">
+            {/* Código de descuento (solo con sesión: se valida contra la cuenta) */}
+            {isAuthenticated && (
+              <div className="mb-3">
+                {coupon ? (
+                  <div className="flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px] text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300">
+                    <span className="flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[15px]">sell</span>
+                      <span>
+                        <span className="font-mono font-extrabold tracking-wider">
+                          {coupon.code}
+                        </span>{" "}
+                        aplicado · {coupon.percent}% en lugar del 10% del Club
+                      </span>
+                    </span>
+                    <button
+                      aria-label="Quitar el cupón"
+                      className="rounded p-0.5 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
+                      onClick={() => {
+                        onRemoveCoupon();
+                        setCode("");
+                        setCouponError(null);
+                      }}
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">close</span>
+                    </button>
+                  </div>
+                ) : couponOpen ? (
+                  <form className="space-y-1" onSubmit={(event) => void applyCoupon(event)}>
+                    <div className="flex gap-2">
+                      <input
+                        aria-label="Código de descuento"
+                        autoFocus
+                        className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2.5 font-mono text-xs uppercase tracking-wider text-slate-900 outline-none placeholder:normal-case placeholder:tracking-normal focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                        maxLength={20}
+                        onChange={(event) => {
+                          setCode(event.target.value);
+                          setCouponError(null);
+                        }}
+                        placeholder="Escribe tu código"
+                        value={code}
+                      />
+                      <button
+                        className="h-9 rounded-lg bg-slate-900 px-3 text-xs font-bold text-white hover:bg-primary disabled:opacity-60 dark:bg-primary dark:hover:bg-[#E04B16]"
+                        disabled={applying || !code.trim()}
+                        type="submit"
+                      >
+                        {applying ? "…" : "Aplicar"}
+                      </button>
+                    </div>
+                    {couponError && (
+                      <p
+                        className="text-[10.5px] font-semibold text-red-600 dark:text-red-400"
+                        role="alert"
+                      >
+                        {couponError}
+                      </p>
+                    )}
+                  </form>
+                ) : (
+                  <button
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-secondary hover:text-primary dark:text-blue-400"
+                    onClick={() => setCouponOpen(true)}
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">sell</span>
+                    ¿Tienes un código de descuento?
+                  </button>
+                )}
+              </div>
+            )}
+
             <dl className="space-y-1.5 text-[11.5px]">
               <div className="flex items-center justify-between">
                 <dt className="text-slate-500 dark:text-slate-400">Subtotal</dt>
@@ -423,9 +523,9 @@ export function CartDrawer({
               {isAuthenticated ? (
                 <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
                   <dt className="flex items-center gap-1.5">
-                    Descuento Club 10%
+                    {coupon ? `Cupón de bienvenida ${coupon.percent}%` : "Descuento Club 10%"}
                     <span className="rounded bg-emerald-50 px-1 py-0.5 text-[8px] font-extrabold tracking-wide dark:bg-emerald-950/60">
-                      CLUB10
+                      {coupon ? coupon.code : "CLUB10"}
                     </span>
                   </dt>
                   <dd className="font-semibold">−{money(discount)}</dd>
@@ -494,12 +594,25 @@ export function CartDrawer({
 
             <button
               aria-describedby={!isAuthenticated ? "cart-auth-required" : undefined}
-              className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-bold text-white shadow-lg shadow-primary/25 transition-all hover:-translate-y-px hover:bg-[#F04A10] hover:shadow-xl hover:shadow-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/40"
-              onClick={() => onCheckout(total)}
+              aria-busy={checkoutLoading}
+              className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-bold text-white shadow-lg shadow-primary/25 transition-all hover:-translate-y-px hover:bg-[#F04A10] hover:shadow-xl hover:shadow-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:cursor-wait disabled:opacity-80 disabled:hover:translate-y-0"
+              disabled={checkoutLoading}
+              onClick={onCheckout}
               type="button"
             >
-              Tramitar Pedido ({money(total)})
-              <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+              {checkoutLoading ? (
+                <>
+                  <span className="material-symbols-outlined animate-spin text-[18px]">
+                    progress_activity
+                  </span>
+                  Conectando con el pago seguro…
+                </>
+              ) : (
+                <>
+                  Tramitar Pedido ({money(total)})
+                  <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                </>
+              )}
             </button>
 
             <button

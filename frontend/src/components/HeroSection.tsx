@@ -117,17 +117,14 @@ export function HeroSection() {
         <div className="md:hidden absolute inset-0 bg-black/45 z-10 pointer-events-none"></div>
         {/* Content Container directly over the video */}
         <div className="relative z-20 max-w-[1320px] mx-auto px-4 sm:px-6 md:px-8 w-full">
-          <div className="max-w-2xl space-y-6">
+          <div className="hero-stagger max-w-2xl space-y-6">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-primary/20 border border-primary/40 text-primary text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
               <span className="">Ropa técnica y cómoda para todos los niveles</span>
             </div>
             <h1 className="font-display-hero text-3xl sm:text-4xl md:text-5xl lg:text-[54px] font-extrabold tracking-tight uppercase leading-[1.1] text-white drop-shadow-sm">
               AQUÍ ENCUENTRAS LA ROPA{" "}
-              <span className="text-primary underline decoration-primary/30 underline-offset-4">
-                MÁS CÓMODA
-              </span>{" "}
-              Y DE MÁS CALIDAD.
+              <span className="hero-underline text-primary">MÁS CÓMODA</span> Y DE MÁS CALIDAD.
             </h1>
             <p className="text-base sm:text-lg text-slate-200 max-w-xl leading-relaxed drop-shadow-sm">
               El deporte es para todos. Diseñamos prendas ultra cómodas y técnicas para que dar el

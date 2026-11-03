@@ -1,7 +1,12 @@
 // db/pool.ts
 // Única puerta de entrada a MySQL: pool de conexiones y utilidades de consulta.
 // Todas las consultas del backend pasan por aquí (nunca se concatenan valores).
-import mysql, { type Pool, type ResultSetHeader, type RowDataPacket } from "mysql2/promise";
+import mysql, {
+  type Pool,
+  type PoolConnection,
+  type ResultSetHeader,
+  type RowDataPacket,
+} from "mysql2/promise";
 import { env } from "../config/env";
 import { logger } from "../utils/logger";
 
@@ -33,6 +38,22 @@ export async function rows<T extends RowDataPacket>(
 export async function run(sql: string, params: unknown[] = []): Promise<ResultSetHeader> {
   const [result] = await pool.query(sql, params);
   return result as ResultSetHeader;
+}
+
+/** Ejecuta varias consultas como una sola transacción. */
+export async function inTransaction<T>(work: (conn: PoolConnection) => Promise<T>): Promise<T> {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const result = await work(conn);
+    await conn.commit();
+    return result;
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
 }
 
 /** Comprueba que la base responde (lo usa /api/health y el arranque). */

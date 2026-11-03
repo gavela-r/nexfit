@@ -26,4 +26,12 @@ export class ApiError extends Error {
   static conflict(message: string, details?: string[]): ApiError {
     return new ApiError(409, message, details);
   }
+
+  static forbidden(message: string): ApiError {
+    return new ApiError(403, message);
+  }
+
+  static unavailable(message: string): ApiError {
+    return new ApiError(503, message);
+  }
 }

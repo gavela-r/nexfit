@@ -173,6 +173,97 @@ export async function clearCart(token?: string): Promise<CartView> {
   return cartRequest<CartView>("/cart", { method: "DELETE", token });
 }
 
+// ------------------------------------------------------- Pedidos y pago
+
+export interface OrderLineView {
+  /** id de order_items (lo usan las devoluciones). */
+  id: number;
+  productId: string | null;
+  productName: string;
+  size: string;
+  color: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+}
+
+export interface OrderView {
+  orderNumber: string;
+  status: "pendiente" | "pagado" | "enviado" | "entregado" | "cancelado" | "devuelto";
+  subtotal: number;
+  shippingCost: number;
+  discount: number;
+  /** Cupón del descuento: CLUB10 o MOVE15 (null si no hubo descuento). */
+  couponCode: string | null;
+  total: number;
+  currency: string;
+  paymentMethod: string | null;
+  email: string | null;
+  shipping: {
+    name: string | null;
+    phone: string | null;
+    address: string | null;
+    city: string | null;
+    postalCode: string | null;
+    country: string;
+  };
+  items: OrderLineView[];
+  createdAt: string;
+}
+
+/** Convierte la cesta en pedido y devuelve la URL de pago de Stripe Checkout. */
+export async function createCheckoutSession(
+  token: string,
+  couponCode?: string,
+): Promise<{ url: string; orderNumber: string }> {
+  return request<{ url: string; orderNumber: string }>("/checkout/session", {
+    method: "POST",
+    body: JSON.stringify(couponCode ? { couponCode } : {}),
+    token,
+  });
+}
+
+// ---------------------------------------------------------------- Cupones
+
+export interface Coupon {
+  code: string;
+  percent: number;
+  title: string;
+  description: string;
+  /** Se aplica sin escribir el código (CLUB10). */
+  automatic: boolean;
+}
+
+export type CouponStatus = "activo" | "disponible" | "usado" | "no_disponible";
+
+/** Comprueba un código para el usuario (ApiRequestError con el motivo si no vale). */
+export async function validateCoupon(token: string, code: string): Promise<Coupon> {
+  return request<Coupon>("/coupons/validate", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+    token,
+  });
+}
+
+/** Cupones de la tienda con su estado para el usuario (página del Club). */
+export async function getCoupons(token: string): Promise<(Coupon & { status: CouponStatus })[]> {
+  return request<(Coupon & { status: CouponStatus })[]>("/coupons", { token });
+}
+
+/** Texto del descuento de un pedido según su cupón. */
+export function discountLabel(couponCode: string | null): string {
+  return couponCode === "MOVE15" ? "Cupón bienvenida MOVE15 (15%)" : "Descuento Club 10%";
+}
+
+/** Al volver de Stripe: verifica el pago y devuelve el pedido. */
+export async function confirmCheckout(token: string, sessionId: string): Promise<OrderView> {
+  return request<OrderView>("/checkout/confirm", {
+    method: "POST",
+    body: JSON.stringify({ sessionId }),
+    token,
+  });
+}
+
 // -------------------------------------------------------------- Favoritos
 
 /** Productos favoritos del usuario (requiere sesión). */
@@ -248,11 +339,19 @@ export async function searchProducts(query: string, signal?: AbortSignal): Promi
 
 // -------------------------------------------------------------- Autenticación
 
+/** Talla habitual del usuario (null = sin indicar). */
+export interface UserSizes {
+  top: string | null;
+  bottom: string | null;
+  shoe: string | null;
+}
+
 export interface AuthUser {
   id: string;
   name: string;
   email: string;
   createdAt: string;
+  sizes: UserSizes;
 }
 
 export interface AuthSession {
@@ -302,6 +401,265 @@ export async function logoutUser(token: string): Promise<void> {
 /** Perfil de la sesión abierta (401 si el token ya no es válido). */
 export async function getSessionUser(token: string): Promise<AuthUser> {
   return request<AuthUser>("/auth/me", { token });
+}
+
+/** Cambia el nombre y el correo de la cuenta. */
+export async function updateProfile(token: string, name: string, email: string): Promise<AuthUser> {
+  return request<AuthUser>("/auth/me", {
+    method: "PATCH",
+    body: JSON.stringify({ name, email }),
+    token,
+  });
+}
+
+/** Guarda la talla habitual y devuelve el perfil actualizado. */
+export async function updateSizes(token: string, sizes: UserSizes): Promise<AuthUser> {
+  return request<AuthUser>("/auth/sizes", {
+    method: "PATCH",
+    body: JSON.stringify(sizes),
+    token,
+  });
+}
+
+// ------------------------------------------------------------ Direcciones
+
+export interface Address {
+  id: number;
+  label: string | null;
+  fullName: string;
+  phone: string | null;
+  addressLine: string;
+  city: string;
+  postalCode: string;
+  country: "ES" | "PT";
+  isDefault: boolean;
+}
+
+export type AddressInput = Omit<Address, "id" | "isDefault"> & { isDefault?: boolean };
+
+/** Todas devuelven la lista actualizada (la predeterminada primero). */
+export async function getAddresses(token: string): Promise<Address[]> {
+  return request<Address[]>("/addresses", { token });
+}
+
+export async function createAddress(token: string, address: AddressInput): Promise<Address[]> {
+  return request<Address[]>("/addresses", {
+    method: "POST",
+    body: JSON.stringify(address),
+    token,
+  });
+}
+
+export async function updateAddress(
+  token: string,
+  id: number,
+  address: AddressInput,
+): Promise<Address[]> {
+  return request<Address[]>(`/addresses/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(address),
+    token,
+  });
+}
+
+export async function deleteAddress(token: string, id: number): Promise<Address[]> {
+  return request<Address[]>(`/addresses/${id}`, { method: "DELETE", token });
+}
+
+export async function setDefaultAddress(token: string, id: number): Promise<Address[]> {
+  return request<Address[]>(`/addresses/${id}/default`, { method: "POST", token });
+}
+
+/** Cambia la contraseña (cierra las sesiones de otros dispositivos). */
+export async function changePassword(
+  token: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  await request<{ changed: boolean }>("/auth/password", {
+    method: "POST",
+    body: JSON.stringify({ currentPassword, newPassword }),
+    token,
+  });
+}
+
+/** Pedidos del usuario, del más reciente al más antiguo. */
+export async function getOrders(token: string): Promise<OrderView[]> {
+  return request<OrderView[]>("/orders", { token });
+}
+
+// ------------------------------------------------- Devoluciones y cambios
+
+export type ReturnKind = "devolucion" | "cambio";
+export type ReturnReason = "talla" | "defecto" | "no_esperado" | "otro";
+
+export interface ReturnableItem {
+  orderItemId: number;
+  productId: string | null;
+  productName: string;
+  size: string;
+  color: string;
+  unitPrice: number;
+  purchased: number;
+  /** Unidades que aún se pueden devolver o cambiar. */
+  returnable: number;
+  /** Tallas del producto (para elegir la nueva en un cambio). */
+  sizes: string[];
+}
+
+export interface EligibleOrder {
+  orderNumber: string;
+  createdAt: string;
+  deadline: string;
+  items: ReturnableItem[];
+}
+
+export interface ReturnView {
+  returnNumber: string;
+  orderNumber: string;
+  type: ReturnKind;
+  status: "solicitada" | "aprobada" | "recibida" | "completada" | "rechazada";
+  reason: ReturnReason;
+  comments: string | null;
+  refundAmount: number;
+  createdAt: string;
+  items: {
+    productName: string;
+    size: string;
+    color: string;
+    quantity: number;
+    newSize: string | null;
+  }[];
+}
+
+export interface ReturnRequest {
+  orderNumber: string;
+  type: ReturnKind;
+  reason: ReturnReason;
+  comments?: string;
+  items: { orderItemId: number; quantity: number; newSize?: string }[];
+}
+
+/** Solicitudes del usuario y pedidos que aún admiten devolución. */
+export async function getReturns(
+  token: string,
+): Promise<{ returns: ReturnView[]; eligibleOrders: EligibleOrder[] }> {
+  return request<{ returns: ReturnView[]; eligibleOrders: EligibleOrder[] }>("/returns", { token });
+}
+
+export async function createReturn(token: string, body: ReturnRequest): Promise<ReturnView> {
+  return request<ReturnView>("/returns", { method: "POST", body: JSON.stringify(body), token });
+}
+
+export interface CategorySummary {
+  slug: string;
+  label: string;
+  /** Número real de productos activos de la disciplina. */
+  items: number;
+}
+
+/** Disciplinas con su número de productos (tarjetas de la portada). */
+export async function getCategories(signal?: AbortSignal): Promise<CategorySummary[]> {
+  return request<CategorySummary[]>("/categories", { signal });
+}
+
+// ------------------------------------------------------- Ficha de producto
+
+export interface ProductPageData {
+  product: Product;
+  /** Colores con su nombre comercial. */
+  colors: { value: string; name: string; hasBorder: boolean }[];
+  /** Tallas con sus unidades disponibles (0 = agotada). */
+  sizes: { size: string; stock: number }[];
+  related: Product[];
+}
+
+export type ReviewSort = "recientes" | "mejores" | "peores";
+
+export interface PublicReview {
+  author: string;
+  rating: number;
+  title: string | null;
+  comment: string | null;
+  createdAt: string;
+  mine: boolean;
+}
+
+export interface ProductReviews {
+  average: number;
+  count: number;
+  distribution: Record<"1" | "2" | "3" | "4" | "5", number>;
+  reviews: PublicReview[];
+  page: number;
+  pages: number;
+  canReview: boolean;
+  myReview: { rating: number; title: string | null; comment: string | null } | null;
+}
+
+/** Datos de la ficha (#/producto/:id). Lanza ApiRequestError 404 si no existe. */
+export async function getProductPage(
+  id: string,
+  token?: string,
+  signal?: AbortSignal,
+): Promise<ProductPageData> {
+  return request<ProductPageData>(`/products/${encodeURIComponent(id)}/page`, { token, signal });
+}
+
+/** Reseñas públicas de un producto (5 por página). */
+export async function getProductReviews(
+  id: string,
+  options: { sort?: ReviewSort; page?: number; token?: string } = {},
+): Promise<ProductReviews> {
+  const params = new URLSearchParams({
+    sort: options.sort ?? "recientes",
+    page: String(options.page ?? 1),
+  });
+  return request<ProductReviews>(`/products/${encodeURIComponent(id)}/reviews?${params}`, {
+    token: options.token,
+  });
+}
+
+// ----------------------------------------------------------------- Reseñas
+
+export interface ReviewView {
+  productId: string;
+  productName: string;
+  image: string;
+  rating: number;
+  title: string | null;
+  comment: string | null;
+  updatedAt: string;
+}
+
+export interface PendingReview {
+  productId: string;
+  productName: string;
+  image: string;
+  purchasedAt: string;
+}
+
+export interface MyReviews {
+  reviews: ReviewView[];
+  pending: PendingReview[];
+}
+
+export async function getMyReviews(token: string): Promise<MyReviews> {
+  return request<MyReviews>("/reviews/mine", { token });
+}
+
+/** Crea o actualiza la reseña de una prenda comprada. */
+export async function saveReview(
+  token: string,
+  review: { productId: string; rating: number; title?: string; comment?: string },
+): Promise<MyReviews> {
+  return request<MyReviews>("/reviews", { method: "POST", body: JSON.stringify(review), token });
+}
+
+export async function deleteReview(token: string, productId: string): Promise<MyReviews> {
+  return request<MyReviews>(`/reviews/${encodeURIComponent(productId)}`, {
+    method: "DELETE",
+    token,
+  });
 }
 
 /** Comprueba que la API está viva (usado en la barra de estado). */

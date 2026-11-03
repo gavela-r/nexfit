@@ -88,5 +88,8 @@ export function useAuth() {
     setUser(null);
   }, [token]);
 
-  return { user, token, restoring, login, register, logout };
+  // Tras editar el perfil, la cabecera y el panel muestran los datos nuevos.
+  const updateUser = useCallback((profile: AuthUser) => setUser(profile), []);
+
+  return { user, token, restoring, login, register, logout, updateUser };
 }

@@ -7,6 +7,8 @@ export interface UserView {
   name: string;
   email: string;
   createdAt: string;
+  /** Talla habitual para preseleccionarla en tarjetas y ficha (null = sin indicar). */
+  sizes: { top: string | null; bottom: string | null; shoe: string | null };
 }
 
 /** Registro completo en memoria: vista pública + credencial. */

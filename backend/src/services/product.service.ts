@@ -174,14 +174,63 @@ export async function getProduct(id: string, userId?: string): Promise<Product> 
   return toProduct(row, colors);
 }
 
+export interface ProductPage {
+  product: Product;
+  /** Colores con su nombre comercial (la tarjeta solo usa el hex). */
+  colors: { value: string; name: string; hasBorder: boolean }[];
+  /** Tallas con sus unidades disponibles (0 = agotada). */
+  sizes: { size: string; stock: number }[];
+  /** Otras prendas de la misma disciplina, las mejor valoradas primero. */
+  related: Product[];
+}
+
+/** Datos de la ficha de producto (#/producto/:id). */
+export async function getProductPage(id: string, userId?: string): Promise<ProductPage> {
+  const product = await getProduct(id, userId);
+
+  const [colors, sizes, relatedRows, allColors] = await Promise.all([
+    rows<RowDataPacket & { color_hex: string; color_name: string; has_border: number }>(
+      `SELECT color_hex, color_name, has_border FROM product_colors
+        WHERE product_id = ? ORDER BY sort_order, color_hex`,
+      [id],
+    ),
+    rows<RowDataPacket & { size: string; stock: number }>(
+      "SELECT size, stock FROM product_sizes WHERE product_id = ? ORDER BY sort_order, size",
+      [id],
+    ),
+    rows<CatalogRow>(
+      `${CATALOG_SELECT} WHERE v.category_slug = ? AND v.id <> ?
+        ORDER BY (v.audience = ?) DESC, v.rating DESC, v.name LIMIT 4`,
+      [userId ?? null, product.categorySlug ?? "", id, product.audience ?? "unisex"],
+    ),
+    loadColors(),
+  ]);
+
+  return {
+    product,
+    colors: colors.map((color) => ({
+      value: color.color_hex,
+      name: color.color_name,
+      hasBorder: Number(color.has_border) === 1,
+    })),
+    sizes: sizes.map((row) => ({ size: row.size, stock: Number(row.stock) })),
+    related: relatedRows.map((row) => toProduct(row, allColors)),
+  };
+}
+
+/** Disciplinas con el número real de productos activos de cada una. */
 export async function listCategories(): Promise<Category[]> {
-  const list = await rows<RowDataPacket & { slug: string; label: string; items_count: number }>(
-    "SELECT slug, label, items_count FROM categories ORDER BY sort_order, id",
+  const list = await rows<RowDataPacket & { slug: string; label: string; total: number }>(
+    `SELECT c.slug, c.label, COUNT(p.id) AS total
+       FROM categories c
+       LEFT JOIN products p ON p.category_id = c.id AND p.is_active = 1
+      GROUP BY c.id, c.slug, c.label, c.sort_order
+      ORDER BY c.sort_order, c.id`,
   );
 
   return list.map((row) => ({
     slug: row.slug,
     label: row.label,
-    items: Number(row.items_count),
+    items: Number(row.total),
   }));
 }

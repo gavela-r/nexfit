@@ -153,6 +153,8 @@ sesiones, carrito, favoritos y newsletter.
 | `GET`    | `/api/health`                | Estado del servicio y de la base de datos (`503` si MySQL no responde)                        |
 | `GET`    | `/api/products`              | Catálogo desde MySQL. Acepta `?category=`, `?search=` y `?sort=rating\|price-asc\|price-desc` |
 | `GET`    | `/api/products/:id`          | Detalle de un producto (404 si no existe)                                                     |
+| `GET`    | `/api/products/:id/page`     | Ficha (#/producto/:id): producto, colores con nombre, stock por talla y 4 relacionados        |
+| `GET`    | `/api/products/:id/reviews`  | Opiniones públicas: media, reparto por estrellas y lista (`?sort=recientes\|mejores\|peores&page=`) |
 | `GET`    | `/api/categories`            | Las 6 disciplinas con su número de artículos                                                  |
 | `GET`    | `/api/cart`                  | Carrito (unidades y total) del usuario o del invitado                                         |
 | `POST`   | `/api/cart/items`            | Añade una línea (`productId`, `size`, `color`, `quantity`)                                    |
@@ -168,6 +170,23 @@ sesiones, carrito, favoritos y newsletter.
 | `POST`   | `/api/auth/login`            | Inicia sesión (`email`, `password`) · `401` si las credenciales no coinciden                  |
 | `POST`   | `/api/auth/logout`           | Cierra la sesión del token (`Authorization: Bearer <token>`)                                  |
 | `GET`    | `/api/auth/me`               | Perfil de la sesión abierta (`Authorization: Bearer <token>`)                                 |
+| `PATCH`  | `/api/auth/me`               | Edita nombre y correo (`name`, `email`) · `409` si el correo es de otra cuenta                |
+| `POST`   | `/api/auth/password`         | Cambia la contraseña (`currentPassword`, `newPassword`) y cierra las demás sesiones           |
+| `PATCH`  | `/api/auth/sizes`            | Talla habitual (`top`, `bottom`: XS–XXL · `shoe`: 36–46; `null` = sin indicar)                |
+| `GET`    | `/api/addresses`             | Direcciones de envío del usuario (la predeterminada primero) · requiere sesión                |
+| `POST`   | `/api/addresses`             | Añade una dirección (máx. 5; solo ES/PT, con su formato de código postal)                     |
+| `PATCH`  | `/api/addresses/:id`         | Edita una dirección · `DELETE` la borra · `POST /api/addresses/:id/default` la hace predeterminada |
+| `POST`   | `/api/checkout/session`      | Convierte la cesta en pedido `pendiente` y devuelve la URL de Stripe Checkout (`couponCode` opcional) · requiere sesión |
+| `GET`    | `/api/coupons`               | Cupones con su estado para el usuario: CLUB10 (activo) y MOVE15 (disponible, usado o no disponible) |
+| `POST`   | `/api/coupons/validate`      | Comprueba un código (`{ "code": "MOVE15" }`): 15% solo en el primer pedido, no acumulable con CLUB10 |
+| `POST`   | `/api/checkout/confirm`      | Vuelta de Stripe (`{ "sessionId": "cs_..." }`): verifica el cobro y devuelve el pedido · requiere sesión |
+| `POST`   | `/api/checkout/webhook`      | Webhook firmado de Stripe (`checkout.session.completed`) · requiere `STRIPE_WEBHOOK_SECRET`   |
+| `GET`    | `/api/orders`                | Pedidos del usuario (sin los intentos cancelados) · requiere sesión                           |
+| `GET`    | `/api/returns`               | Devoluciones/cambios del usuario y pedidos entregados que aún admiten devolución (30 días)    |
+| `POST`   | `/api/returns`               | Pide una devolución o cambio de talla (`orderNumber`, `type`, `reason`, `items`) · requiere sesión |
+| `GET`    | `/api/reviews/mine`          | Reseñas del usuario y prendas compradas pendientes de valorar · requiere sesión               |
+| `POST`   | `/api/reviews`               | Crea o actualiza una reseña (`productId`, `rating` 1-5, `title`, `comment`) de algo comprado  |
+| `DELETE` | `/api/reviews/:productId`    | Borra la reseña; la nota del producto se recalcula con `rating_base` y las reseñas            |
 
 **Identidad del carrito.** Con sesión, el carrito es del usuario
 (`Authorization: Bearer <token>`). Sin sesión, el backend crea una cesta de
@@ -233,8 +252,8 @@ cualquier otra excepción cae en el manejador global y responde `500` en JSON
   «Tramitar Pedido» exige sesión: si el usuario no ha entrado, el botón abre
   `AuthModal` en la pestaña de acceso (el panel muestra además un aviso con candado
   «Necesitas una cuenta para tramitar el pedido»), y al iniciar sesión o registrarse
-  la cesta se reabre automáticamente. Con sesión, el pedido es una demostración
-  (muestra un aviso, porque no hay pasarela de pago). «Ver Cesta Detallada» también
+  la cesta se reabre automáticamente. Con sesión, el pago se hace con **Stripe
+  Checkout** (ver «Pago con Stripe» más abajo). «Ver Cesta Detallada» es
   es una acción de demostración. El estado vacío invita a explorar el catálogo.
   En móvil ocupa toda la pantalla y, con el panel abierto, `Esc` o un clic en el fondo
   lo cierran.
@@ -252,6 +271,25 @@ cualquier otra excepción cae en el manejador global y responde `500` en JSON
   la cabecera pasa a mostrar el avatar con las iniciales, el nombre y el botón de salir.
 - **Contadores**: el carrito y los favoritos muestran cifras reales de la base
   (0 si el usuario aún no tiene nada) y se mantienen al recargar y entre sesiones.
+- **Pago con Stripe**: «Tramitar Pedido» llama a `POST /api/checkout/session`. El
+  backend recalcula el importe (descuento Club del 10 % con un cupón de un solo uso
+  y envío de 4,95 € por debajo de 50 €), guarda el pedido `pendiente` en
+  `orders`/`order_items` y redirige a la página de pago de Stripe, donde se piden
+  la tarjeta, la dirección de envío (España o Portugal) y el teléfono. Al pagar,
+  Stripe vuelve a `/?session_id=…#/pedido/confirmado`: la página llama a
+  `POST /api/checkout/confirm`, el pedido pasa a `pagado` con los datos de envío,
+  la cesta queda `convertido` (la siguiente compra empieza vacía) y baja el stock
+  de cada talla. Si el cliente cancela, vuelve a `#/pedido/cancelado` con la cesta
+  intacta. La confirmación es idempotente, así que la vuelta del navegador y el
+  webhook pueden llegar los dos sin duplicar nada.
+
+  Para probarlo, copia las claves de **prueba** de
+  [dashboard.stripe.com/test/apikeys](https://dashboard.stripe.com/test/apikeys) en
+  `backend/.env` (`STRIPE_SECRET_KEY=sk_test_...`), reinicia el backend y paga con la
+  tarjeta `4242 4242 4242 4242`, cualquier fecha futura y cualquier CVC. El webhook es
+  opcional en desarrollo; para activarlo:
+  `stripe listen --forward-to localhost:4000/api/checkout/webhook` y copia el
+  `whsec_...` que muestra en `STRIPE_WEBHOOK_SECRET`.
 - **Newsletter**: alta real contra la API con estados de carga, éxito y error.
 - **Cupón MOVE15**: copia al portapapeles y muestra confirmación visual.
 
@@ -370,6 +408,8 @@ El backend **ya usa esta base de datos para todo**: el catálogo sale de
 Los datos transaccionales de ejemplo (2 favoritos, 1 cesta con 2 líneas y 1
 pedido entregado) están en la sección 8 del script, marcada como opcional: si
 prefieres empezar con las tablas vacías, borra ese bloque antes de importar.
+No hay reseñas de ejemplo: las opiniones de la ficha de producto son solo las
+de clientes registrados (con la cuenta activa) que han comprado la prenda.
 
 ## 9. Docker
 
