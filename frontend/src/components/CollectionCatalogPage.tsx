@@ -4,7 +4,7 @@
 // Textos y opciones de filtro llegan en `config` (data/catalogs.ts).
 // Los productos llegan de GET /api/products[?audience=…] (con respaldo local);
 // el filtrado se hace en el navegador porque la colección es pequeña.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { getProducts, getProductsByAudience, type CartItemInput } from "../api";
 import type { CatalogConfig } from "../data/catalogs";
 import { products as localProducts, type Product } from "../data/products";
@@ -31,6 +31,9 @@ const CHECKBOX =
   "w-4 h-4 rounded border-slate-300 dark:border-slate-600 accent-[#FF5A1F] cursor-pointer";
 const FILTER_TITLE =
   "float-left w-full text-[13px] font-bold text-slate-900 dark:text-white mb-2.5";
+
+/** Retraso de la animación de entrada (data-reveal) para escalonar bloques. */
+const revealDelay = (ms: number) => ({ "--reveal-delay": `${ms}ms` }) as CSSProperties;
 
 function disciplineOf(config: CatalogConfig, product: Product): string | undefined {
   const slug = product.categorySlug ?? "";
@@ -195,7 +198,11 @@ export function CollectionCatalogPage({
     <div className="w-full bg-[#F5F7FB] dark:bg-[#0B1220]">
       <div className="max-w-[1320px] mx-auto px-4 sm:px-6 md:px-8 pt-6 pb-14 md:pb-20">
         {/* Migas de pan */}
-        <nav aria-label="Migas de pan" className="text-xs text-slate-500 dark:text-slate-400">
+        <nav
+          aria-label="Migas de pan"
+          className="text-xs text-slate-500 dark:text-slate-400"
+          data-reveal
+        >
           <ol className="flex items-center gap-1.5">
             <li>
               <a className="hover:text-primary transition-colors" href="#">
@@ -223,7 +230,11 @@ export function CollectionCatalogPage({
         </nav>
 
         {/* Cabecera de la colección */}
-        <header className="mt-5 flex flex-col md:flex-row md:items-end justify-between gap-5">
+        <header
+          className="mt-5 flex flex-col md:flex-row md:items-end justify-between gap-5"
+          data-reveal
+          style={revealDelay(90)}
+        >
           <div className="max-w-3xl">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 dark:bg-primary/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-primary">
               <span className="w-1.5 h-1.5 rounded-full bg-primary" />
@@ -245,7 +256,10 @@ export function CollectionCatalogPage({
         </header>
 
         {/* Chips de disciplina (o de prenda) */}
-        <div className="mt-6 flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1">
+        <div
+          className="mt-6 flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1"
+          data-reveal-stagger
+        >
           <button
             type="button"
             aria-pressed={activeChip === "all"}
@@ -289,6 +303,8 @@ export function CollectionCatalogPage({
           <aside
             id={`filtros-${config.slug}`}
             aria-label="Filtros técnicos"
+            data-reveal="left"
+            style={revealDelay(180)}
             className={`${
               filtersOpen ? "block" : "hidden"
             } lg:block lg:sticky lg:top-28 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 p-5 shadow-sm`}
@@ -497,7 +513,10 @@ export function CollectionCatalogPage({
             </div>
 
             {pageItems.length > 0 ? (
-              <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+              <div
+                className="mt-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5"
+                data-reveal-stagger
+              >
                 {pageItems.map((product) => (
                   <CatalogProductCard
                     key={`${product.id}-${size ?? ""}`}
@@ -511,7 +530,10 @@ export function CollectionCatalogPage({
                 ))}
               </div>
             ) : (
-              <div className="mt-5 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800/60 p-10 text-center">
+              <div
+                data-reveal="zoom"
+                className="mt-5 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800/60 p-10 text-center"
+              >
                 <span className="material-symbols-outlined text-[36px] text-slate-300 dark:text-slate-600">
                   search_off
                 </span>
@@ -585,7 +607,10 @@ export function CollectionCatalogPage({
         </div>
 
         {/* Ayuda: tallas, garantía y envíos */}
-        <section className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-8 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 p-6 md:p-8 shadow-sm">
+        <section
+          data-reveal-stagger
+          className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-8 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 p-6 md:p-8 shadow-sm"
+        >
           <div className="flex gap-4">
             <span className="shrink-0 w-11 h-11 rounded-xl bg-orange-50 dark:bg-primary/15 text-primary flex items-center justify-center">
               <span className="material-symbols-outlined text-[22px]">straighten</span>

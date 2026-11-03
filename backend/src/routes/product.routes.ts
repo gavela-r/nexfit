@@ -1,6 +1,6 @@
 // routes/product.routes.ts
 import { Router } from "express";
-import { categories, getOne, list } from "../controllers/product.controller";
+import { categories, getOne, list, page, reviews } from "../controllers/product.controller";
 import { asyncHandler } from "../utils/asyncHandler";
 
 export const productRouter = Router();
@@ -10,6 +10,12 @@ productRouter.get("/products", asyncHandler(list));
 
 /** GET /api/products/:id */
 productRouter.get("/products/:id", asyncHandler(getOne));
+
+/** GET /api/products/:id/page */
+productRouter.get("/products/:id/page", asyncHandler(page));
+
+/** GET /api/products/:id/reviews?sort=&page= */
+productRouter.get("/products/:id/reviews", asyncHandler(reviews));
 
 /** GET /api/categories */
 productRouter.get("/categories", asyncHandler(categories));

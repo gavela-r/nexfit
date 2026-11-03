@@ -2,6 +2,7 @@
 import type { Request, Response } from "express";
 import { optionalUser } from "../middlewares/auth";
 import * as service from "../services/product.service";
+import { listProductReviews, type ReviewSort } from "../services/reviews.service";
 import type { ProductSort } from "../services/product.service";
 import type { Audience } from "../types/product";
 import { respond } from "../utils/respond";
@@ -43,6 +44,28 @@ export async function list(req: Request, res: Response): Promise<void> {
 export async function getOne(req: Request, res: Response): Promise<void> {
   const user = await optionalUser(req);
   respond(res, await service.getProduct(req.params.id, user?.id));
+}
+
+/** GET /api/products/:id/page → ficha: producto, colores con nombre, stock por talla y relacionados */
+export async function page(req: Request, res: Response): Promise<void> {
+  const user = await optionalUser(req);
+  respond(res, await service.getProductPage(req.params.id, user?.id));
+}
+
+const REVIEW_SORTS: ReviewSort[] = ["recientes", "mejores", "peores"];
+
+/** GET /api/products/:id/reviews?sort=recientes|mejores|peores&page=1 */
+export async function reviews(req: Request, res: Response): Promise<void> {
+  const user = await optionalUser(req);
+  const sort = asText(req.query.sort);
+  respond(
+    res,
+    await listProductReviews(req.params.id, {
+      sort: REVIEW_SORTS.includes(sort as ReviewSort) ? (sort as ReviewSort) : "recientes",
+      page: Number(req.query.page) || 1,
+      ...(user ? { userId: user.id } : {}),
+    }),
+  );
 }
 
 /** GET /api/categories */

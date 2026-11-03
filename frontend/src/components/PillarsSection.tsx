@@ -6,7 +6,7 @@ export function PillarsSection() {
     <>
       {/* 4 Pilares oficiales del estándar NEXFIT */}
       <section className="w-full max-w-[1320px] mx-auto px-4 sm:px-6 md:px-8 py-12 md:py-16">
-        <div className="text-center max-w-xl mx-auto mb-12">
+        <div className="text-center max-w-xl mx-auto mb-12" data-reveal>
           <span className="text-xs font-bold text-primary uppercase tracking-wider">
             El Estándar NEXFIT
           </span>
@@ -14,7 +14,7 @@ export function PillarsSection() {
             Rendimiento sin Concesiones
           </h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6" data-reveal-stagger>
           <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
             <div className="w-12 h-12 rounded-xl bg-orange-100 dark:bg-primary/20 flex items-center justify-center text-primary mb-4">
               <span className="material-symbols-outlined text-[26px]" data-icon="accessibility_new">

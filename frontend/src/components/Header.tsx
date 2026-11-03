@@ -1,7 +1,9 @@
 // Header
 // Barra superior + navegación + buscador + acceso y carrito.
-// Responsive: por debajo de xl los enlaces se recogen en un menú desplegable y
-// los textos de los botones se ocultan por tramos para que nada se salga.
+// Responsive: por debajo de lg (1024 px) los enlaces se recogen en un menú
+// desplegable. Entre lg y xl (1024-1279 px) la cabecera es compacta: logo y
+// enlaces algo más pequeños, menos separación, sin la etiqueta SALE y con
+// «Entrar», «Carrito» y el nombre solo como icono. Desde xl, la versión completa.
 import { useEffect, useState } from "react";
 import type { AuthUser } from "../api";
 import type { Page } from "../hooks/useHashRoute";
@@ -22,6 +24,8 @@ interface HeaderProps {
   /** Sesión guardada que aún se está validando al cargar la página. */
   restoring: boolean;
   onOpenLogin: () => void;
+  /** Abre el panel lateral de la cuenta (al pulsar el nombre). */
+  onOpenAccount: () => void;
   onOpenRegister: () => void;
   onLogout: () => void;
 }
@@ -30,14 +34,15 @@ const NAV_LINKS: { href: string; label: string; page?: Page }[] = [
   { href: "#/futbol", label: "Fútbol", page: "futbol" },
   { href: "#/hombre", label: "Hombre", page: "hombre" },
   { href: "#/mujer", label: "Mujer", page: "mujer" },
-  { href: "#fitness", label: "Fitness/Gym" },
+  { href: "#/fitness", label: "Fitness/Gym", page: "fitness" },
   { href: "#/running", label: "Running", page: "running" },
   { href: "#/athleisure", label: "Athleisure", page: "athleisure" },
 ];
 
 const NAV_LINK_CLASS =
-  "text-slate-600 dark:text-slate-300 hover:text-primary dark:hover:text-primary text-sm font-semibold transition-colors pb-1";
-const NAV_LINK_ACTIVE = "text-primary text-sm font-bold border-b-2 border-primary pb-1";
+  "text-slate-600 dark:text-slate-300 hover:text-primary dark:hover:text-primary text-[13px] xl:text-sm font-semibold transition-colors pb-1 whitespace-nowrap";
+const NAV_LINK_ACTIVE =
+  "text-primary text-[13px] xl:text-sm font-bold border-b-2 border-primary pb-1 whitespace-nowrap";
 
 /** Iniciales del usuario para el avatar (máximo dos letras). */
 function getInitials(name: string): string {
@@ -60,6 +65,7 @@ export function Header({
   user,
   restoring,
   onOpenLogin,
+  onOpenAccount,
   onOpenRegister,
   onLogout,
 }: HeaderProps) {
@@ -89,10 +95,10 @@ export function Header({
         <div className="max-w-[1320px] mx-auto px-3 sm:px-6 md:px-8 flex items-center justify-between h-20 w-full gap-2 sm:gap-4">
           {/* Brand Logo NEXFIT */}
           <a
-            className="flex items-center gap-3 shrink-0 group focus:outline-none focus:ring-2 focus:ring-secondary rounded-lg p-1"
+            className="flex items-center gap-3 lg:gap-2 xl:gap-3 shrink-0 group focus:outline-none focus:ring-2 focus:ring-secondary rounded-lg p-1"
             href="#"
           >
-            <div className="w-10 h-10 rounded-xl bg-slate-950 dark:bg-slate-800 flex items-center justify-center shadow-md relative overflow-hidden group-hover:scale-105 transition-transform duration-200">
+            <div className="w-10 h-10 lg:w-9 lg:h-9 xl:w-10 xl:h-10 rounded-xl bg-slate-950 dark:bg-slate-800 flex items-center justify-center shadow-md relative overflow-hidden group-hover:scale-105 transition-transform duration-200">
               <svg
                 className="w-6 h-6 text-primary"
                 fill="none"
@@ -109,14 +115,14 @@ export function Header({
                 ></path>
               </svg>
             </div>
-            <div className="text-xl sm:text-2xl font-black font-headline-md tracking-tight select-none">
+            <div className="text-xl sm:text-2xl lg:text-xl xl:text-2xl font-black font-headline-md tracking-tight select-none">
               <span className="text-slate-900 dark:text-white">NEX</span>
               <span className="text-primary">FIT</span>
             </div>
           </a>
 
-          {/* Navigation Links (escritorio ancho) */}
-          <nav className="hidden xl:flex items-center gap-4 2xl:gap-6">
+          {/* Navigation Links (escritorio: compacta entre lg y xl) */}
+          <nav className="hidden lg:flex items-center gap-3 xl:gap-4 2xl:gap-6">
             {NAV_LINKS.map((link) => {
               const active = link.page !== undefined && link.page === currentPage;
               return (
@@ -131,13 +137,13 @@ export function Header({
               );
             })}
             <a
-              className={`text-primary font-bold text-sm pb-1 flex items-center gap-1.5 ${
+              className={`text-primary font-bold text-[13px] xl:text-sm pb-1 flex items-center gap-1.5 whitespace-nowrap ${
                 currentPage === "home" ? "border-b-2 border-primary" : ""
               }`}
               href="#catalogo"
             >
               Ofertas
-              <span className="bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+              <span className="hidden xl:inline bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                 SALE
               </span>
             </a>
@@ -152,7 +158,7 @@ export function Header({
               aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
               type="button"
               onClick={() => setMenuOpen((current) => !current)}
-              className="xl:hidden p-2 text-slate-700 dark:text-slate-200 hover:text-primary rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:outline-none"
+              className="lg:hidden p-2 text-slate-700 dark:text-slate-200 hover:text-primary rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:outline-none"
             >
               <span className="material-symbols-outlined text-[24px]" data-icon="menu">
                 {menuOpen ? "close" : "menu"}
@@ -194,9 +200,16 @@ export function Header({
 
             {/* Favoritos: solo con sesión iniciada, para no saturar la cabecera */}
             {user && (
-              <button
+              <a
+                aria-current={currentPage === "favoritos" ? "page" : undefined}
                 aria-label="Favoritos"
-                className="hidden sm:flex relative p-2 text-slate-700 dark:text-slate-200 hover:text-primary rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:outline-none"
+                className={`hidden sm:flex relative p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:outline-none ${
+                  currentPage === "favoritos"
+                    ? "text-primary"
+                    : "text-slate-700 dark:text-slate-200 hover:text-primary"
+                }`}
+                href="#/favoritos"
+                title="Mis favoritos"
               >
                 <span className="material-symbols-outlined text-[24px]" data-icon="favorite">
                   favorite
@@ -204,7 +217,7 @@ export function Header({
                 <span className="absolute top-1 right-1 bg-primary text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center ring-2 ring-white dark:ring-slate-900">
                   {favoritesCount}
                 </span>
-              </button>
+              </a>
             )}
 
             {/* Acceso: iniciar sesión y registro (o la cuenta abierta) */}
@@ -215,26 +228,23 @@ export function Header({
               />
             ) : user ? (
               <div className="flex items-center gap-1 sm:gap-1.5">
-                <div
-                  className="flex items-center gap-2 py-1.5 pl-1.5 pr-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
-                  title={user.email}
+                {/* El nombre abre el panel lateral de la cuenta */}
+                <button
+                  aria-haspopup="dialog"
+                  aria-label={`Mi cuenta: ${user.name}`}
+                  className="group flex items-center gap-2 py-1.5 pl-1.5 pr-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  onClick={onOpenAccount}
+                  title="Abrir mi cuenta"
+                  type="button"
                 >
                   <span className="w-6 h-6 rounded-full bg-primary text-white text-[11px] font-black flex items-center justify-center select-none">
                     {getInitials(user.name)}
                   </span>
-                  <span className="hidden md:inline text-xs font-bold text-slate-700 dark:text-slate-200 max-w-[110px] truncate">
+                  <span className="hidden md:inline lg:hidden xl:inline text-xs font-bold text-slate-700 dark:text-slate-200 max-w-[110px] truncate">
                     {user.name.split(" ")[0]}
                   </span>
-                </div>
-                <button
-                  aria-label="Cerrar sesión"
-                  title="Cerrar sesión"
-                  type="button"
-                  onClick={onLogout}
-                  className="p-2 text-slate-700 dark:text-slate-200 hover:text-primary rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:outline-none"
-                >
-                  <span className="material-symbols-outlined text-[22px]" data-icon="logout">
-                    logout
+                  <span className="material-symbols-outlined text-[18px] text-slate-500 dark:text-slate-400 group-hover:text-primary transition-colors">
+                    expand_more
                   </span>
                 </button>
               </div>
@@ -250,7 +260,7 @@ export function Header({
                   <span className="material-symbols-outlined text-[20px]" data-icon="person">
                     person
                   </span>
-                  <span className="hidden md:inline">Entrar</span>
+                  <span className="hidden md:inline lg:hidden xl:inline">Entrar</span>
                 </button>
                 {/* Registro */}
                 <button
@@ -279,10 +289,14 @@ export function Header({
               <span className="material-symbols-outlined text-[21px]" data-icon="shopping_cart">
                 shopping_cart
               </span>
-              <span className="hidden lg:inline text-xs font-bold uppercase tracking-wider">
+              <span className="hidden xl:inline text-xs font-bold uppercase tracking-wider">
                 Carrito
               </span>
-              <span className="bg-primary dark:bg-white dark:text-slate-900 text-white text-[11px] font-extrabold px-1.5 py-0.5 rounded-full">
+              {/* key: el contador se vuelve a montar y «salta» cada vez que cambia */}
+              <span
+                className="badge-pop inline-block bg-primary dark:bg-white dark:text-slate-900 text-white text-[11px] font-extrabold px-1.5 py-0.5 rounded-full"
+                key={cartCount}
+              >
                 {cartCount}
               </span>
             </button>
@@ -292,7 +306,7 @@ export function Header({
         {/* Menú de navegación desplegable (móvil y tablet) */}
         {menuOpen && (
           <div
-            className="xl:hidden absolute inset-x-0 top-full bg-white dark:bg-[#0F172A] border-b border-slate-200 dark:border-slate-800 shadow-xl"
+            className="lg:hidden absolute inset-x-0 top-full bg-white dark:bg-[#0F172A] border-b border-slate-200 dark:border-slate-800 shadow-xl"
             id="mobile-nav"
           >
             <nav className="max-w-[1320px] mx-auto px-4 sm:px-6 md:px-8 py-3 flex flex-col">
@@ -327,7 +341,14 @@ export function Header({
             <div className="max-w-[1320px] mx-auto px-4 sm:px-6 md:px-8 pb-4">
               {user ? (
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-700 p-2.5">
-                  <div className="flex items-center gap-2 min-w-0">
+                  <button
+                    className="flex items-center gap-2 min-w-0 text-left"
+                    onClick={() => {
+                      closeMenu();
+                      onOpenAccount();
+                    }}
+                    type="button"
+                  >
                     <span className="w-8 h-8 rounded-full bg-primary text-white text-xs font-black flex items-center justify-center shrink-0">
                       {getInitials(user.name)}
                     </span>
@@ -339,7 +360,7 @@ export function Header({
                         {user.email}
                       </p>
                     </div>
-                  </div>
+                  </button>
                   <button
                     className="text-xs font-bold text-primary hover:underline shrink-0"
                     onClick={() => {

@@ -33,4 +33,13 @@ export const env = {
   },
   /** Reintentos de arranque mientras MySQL termina de levantar (Docker). */
   dbRetries: readInt(process.env.DB_RETRIES, 15),
+  /** Pasarela de pago (Stripe Checkout). Sin clave secreta, el pago responde 503. */
+  stripe: {
+    secretKey: process.env.STRIPE_SECRET_KEY?.trim() ?? "",
+    /** Firma del webhook (`whsec_...`); sin ella el webhook queda desactivado. */
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET?.trim() ?? "",
+    /** URL pública de la tienda para volver de Stripe. Si falta, se usa el
+     *  Origin de la petición (siempre que esté en CORS_ORIGIN o sea el propio host). */
+    appUrl: (process.env.APP_URL ?? "").trim().replace(/\/+$/, ""),
+  },
 } as const;

@@ -9,7 +9,10 @@ export function BeginnerGuide() {
         className="w-full max-w-[1320px] mx-auto px-4 sm:px-6 md:px-8 py-8"
         id="empezar-guia"
       >
-        <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 md:p-10 shadow-sm">
+        <div
+          className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 md:p-10 shadow-sm"
+          data-reveal
+        >
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
             <div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 dark:bg-primary/20 text-primary text-xs font-bold uppercase tracking-wider mb-2">
@@ -32,7 +35,7 @@ export function BeginnerGuide() {
               <span className="">Test rápido de 1 minuto</span>
             </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6" data-reveal-stagger>
             <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 hover:shadow-md transition-all flex flex-col justify-between space-y-4">
               <div className="space-y-3">
                 <div className="w-12 h-12 rounded-xl bg-orange-100 dark:bg-primary/20 flex items-center justify-center text-primary">
@@ -87,7 +90,7 @@ export function BeginnerGuide() {
               </div>
               <a
                 className="text-secondary dark:text-blue-400 hover:text-primary text-xs font-bold inline-flex items-center gap-1 pt-2 border-t border-slate-100 dark:border-slate-700"
-                href="#fitness"
+                href="#/fitness"
               >
                 <span className="">Ver equipamiento para gimnasio</span>
                 <span className="material-symbols-outlined text-[16px]" data-icon="arrow_forward">

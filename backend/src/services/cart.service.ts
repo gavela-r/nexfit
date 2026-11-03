@@ -253,10 +253,21 @@ export async function updateLine(
   );
 
   if (result.affectedRows === 0) {
-    throw ApiError.notFound(`El producto "${productId}" no está en el carrito con esa talla y color`);
+    throw ApiError.notFound(
+      `El producto "${productId}" no está en el carrito con esa talla y color`,
+    );
   }
 
   return readCart(cart);
+}
+
+/** Cesta abierta del usuario junto con su id (para convertirla en pedido). */
+export async function getOpenCartForCheckout(
+  userId: string,
+): Promise<{ cartId: number; cart: CartView } | null> {
+  const ref = await findOpenCart({ userId });
+  if (!ref) return null;
+  return { cartId: ref.id, cart: await readCart(ref) };
 }
 
 /** Vacía la cesta abierta. */

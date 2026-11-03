@@ -15,12 +15,13 @@ interface SearchOverlayProps {
   open: boolean;
   onClose: () => void;
   /** Término con el que se filtra el catálogo al elegir un resultado. */
-  onSelectQuery: (query: string) => void;
+  /** Abre la ficha del producto elegido. */
+  onSelectProduct: (productId: string) => void;
 }
 
 type Status = "idle" | "loading" | "ready";
 
-export function SearchOverlay({ open, onClose, onSelectQuery }: SearchOverlayProps) {
+export function SearchOverlay({ open, onClose, onSelectProduct }: SearchOverlayProps) {
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   const [status, setStatus] = useState<Status>("idle");
@@ -91,7 +92,7 @@ export function SearchOverlay({ open, onClose, onSelectQuery }: SearchOverlayPro
   if (!open) return null;
 
   const choose = (product: Product) => {
-    onSelectQuery(product.name);
+    onSelectProduct(product.id);
   };
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {

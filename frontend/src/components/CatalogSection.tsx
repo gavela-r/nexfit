@@ -89,7 +89,10 @@ export function CatalogSection({
         className="w-full max-w-[1320px] mx-auto px-4 sm:px-6 md:px-8 py-12 md:py-16"
         id="catalogo"
       >
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+        <div
+          className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4"
+          data-reveal
+        >
           <div>
             <span className="text-xs font-bold text-primary uppercase tracking-wider">
               Demostración de Catálogo
@@ -151,7 +154,10 @@ export function CatalogSection({
 
         {/* Cards Grid */}
         {featured.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+          <div
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8"
+            data-reveal-stagger
+          >
             {featured.map((product) => (
               <ProductCard
                 key={product.id}

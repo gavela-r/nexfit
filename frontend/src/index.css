@@ -110,7 +110,8 @@ aside {
 /* Panel oscuro con degradado naranja y trama de puntos. */
 .auth-panel {
   background-color: #0b1220;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
     radial-gradient(520px 280px at 108% -12%, rgba(255, 90, 31, 0.24), transparent 62%),
     linear-gradient(160deg, #101a2c 0%, #0b1220 60%);
   background-size:
@@ -173,5 +174,198 @@ aside {
   .cart-drawer-enter,
   .cart-overlay-enter {
     animation: none;
+  }
+}
+
+/* ------------------------------------------------ Animaciones de entrada */
+/* Aparición al hacer scroll (useScrollReveal):
+     data-reveal            → el elemento entra subiendo (o "left" / "right" / "zoom")
+     data-reveal-stagger    → los hijos entran uno detrás de otro (--i = orden)
+   Solo se ocultan cuando el hook ha activado html.reveal-on, así que sin JS,
+   sin IntersectionObserver o con «reducir movimiento» todo se ve desde el principio.
+   Se usan animaciones (no transiciones) con fill "backwards" para no pisar las
+   transiciones ni los transform de hover que ya tienen tarjetas y botones. */
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 28px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes reveal-left {
+  from {
+    opacity: 0;
+    transform: translate3d(-36px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes reveal-right {
+  from {
+    opacity: 0;
+    transform: translate3d(36px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes reveal-zoom {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+html.reveal-on [data-reveal]:not(.is-revealed),
+html.reveal-on [data-reveal-stagger]:not(.is-revealed) > * {
+  opacity: 0;
+}
+
+html.reveal-on [data-reveal].is-revealed {
+  animation: reveal-up 700ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: var(--reveal-delay, 0ms);
+}
+
+html.reveal-on [data-reveal="left"].is-revealed {
+  animation-name: reveal-left;
+}
+
+html.reveal-on [data-reveal="right"].is-revealed {
+  animation-name: reveal-right;
+}
+
+html.reveal-on [data-reveal="zoom"].is-revealed {
+  animation-name: reveal-zoom;
+}
+
+html.reveal-on [data-reveal-stagger].is-revealed > * {
+  animation: reveal-up 640ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(min(var(--i, 0), 8) * 85ms);
+}
+
+/* Portada: el texto del hero entra escalonado al cargar la página. */
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 22px, 0);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+.hero-stagger > * {
+  animation: hero-rise 900ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.hero-stagger > *:nth-child(1) {
+  animation-delay: 150ms;
+}
+.hero-stagger > *:nth-child(2) {
+  animation-delay: 280ms;
+}
+.hero-stagger > *:nth-child(3) {
+  animation-delay: 420ms;
+}
+.hero-stagger > *:nth-child(4) {
+  animation-delay: 560ms;
+}
+.hero-stagger > *:nth-child(5) {
+  animation-delay: 700ms;
+}
+
+/* Subrayado del «MÁS CÓMODA» que se dibuja tras la entrada del titular. */
+@keyframes hero-underline {
+  from {
+    background-size: 0% 0.12em;
+  }
+  to {
+    background-size: 100% 0.12em;
+  }
+}
+
+.hero-underline {
+  background-image: linear-gradient(rgba(255, 90, 31, 0.4), rgba(255, 90, 31, 0.4));
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 100% 0.12em;
+  padding-bottom: 0.04em;
+  animation: hero-underline 900ms cubic-bezier(0.65, 0, 0.35, 1) 1000ms backwards;
+}
+
+/* Tarjetas de producto: se elevan al pasar el ratón. */
+.card-lift {
+  transition:
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 300ms ease,
+    background-color 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.card-lift:hover {
+  transform: translateY(-6px);
+}
+
+/* Botón «Añadir»: pequeño rebote al pulsar. */
+@keyframes add-bounce {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(0.92);
+  }
+  70% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.add-bounce {
+  animation: add-bounce 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Contador de la cesta: «salta» cada vez que cambia. */
+@keyframes badge-pop {
+  0% {
+    transform: scale(0.4);
+  }
+  60% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.badge-pop {
+  animation: badge-pop 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-stagger > *,
+  .hero-underline,
+  .add-bounce,
+  .badge-pop {
+    animation: none;
+  }
+  .card-lift:hover {
+    transform: none;
   }
 }

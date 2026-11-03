@@ -6,7 +6,7 @@ export function CollectionBanners() {
     <>
       {/* Twin Collection Banners (Hombre y Mujer) */}
       <section className="w-full max-w-[1320px] mx-auto px-4 sm:px-6 md:px-8 py-10 md:py-14">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8" data-reveal-stagger>
           {/* Hombre Banner */}
           <div
             className="group relative rounded-2xl overflow-hidden min-h-[360px] lg:min-h-[400px] flex flex-col justify-end p-8 border border-slate-200 dark:border-slate-800 shadow-sm"

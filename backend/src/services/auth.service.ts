@@ -21,7 +21,14 @@ export interface RegisterInput {
   password: string;
 }
 
-interface UserRow extends RowDataPacket {
+/** Columnas de la talla habitual (pueden estar vacías). */
+interface SizeColumns {
+  size_top?: string | null;
+  size_bottom?: string | null;
+  size_shoe?: string | null;
+}
+
+interface UserRow extends RowDataPacket, SizeColumns {
   id: string;
   name: string;
   email: string;
@@ -29,7 +36,7 @@ interface UserRow extends RowDataPacket {
   created_at: Date | string;
 }
 
-interface SessionUserRow extends RowDataPacket {
+interface SessionUserRow extends RowDataPacket, SizeColumns {
   id: string;
   name: string;
   email: string;
@@ -37,18 +44,24 @@ interface SessionUserRow extends RowDataPacket {
   expires_at: Date | string | null;
 }
 
+/** Tallas que se pueden guardar en el perfil. */
+const CLOTHING_SIZES = ["XS", "S", "M", "L", "XL", "XXL"];
+const SHOE_SIZES = ["36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46"];
+
 /** Vista pública: jamás se devuelve el hash de la contraseña. */
-function toView(row: {
-  id: string;
-  name: string;
-  email: string;
-  created_at: Date | string;
-}): UserView {
+function toView(
+  row: { id: string; name: string; email: string; created_at: Date | string } & SizeColumns,
+): UserView {
   return {
     id: row.id,
     name: row.name,
     email: row.email,
     createdAt: new Date(row.created_at).toISOString(),
+    sizes: {
+      top: row.size_top ?? null,
+      bottom: row.size_bottom ?? null,
+      shoe: row.size_shoe ?? null,
+    },
   };
 }
 
@@ -106,7 +119,7 @@ export async function register(input: RegisterInput): Promise<AuthPayload> {
 /** Valida credenciales (401 si no coinciden) e inicia sesión. */
 export async function login(email: string, password: string): Promise<AuthPayload> {
   const [user] = await rows<UserRow>(
-    `SELECT id, name, email, password_hash, created_at
+    `SELECT id, name, email, password_hash, created_at, size_top, size_bottom, size_shoe
        FROM users
       WHERE email = ? AND is_active = 1
       LIMIT 1`,
@@ -135,7 +148,7 @@ export async function getUserByToken(token?: string): Promise<UserView> {
   if (!token) throw ApiError.unauthorized("No hay sesión iniciada");
 
   const [session] = await rows<SessionUserRow>(
-    `SELECT u.id, u.name, u.email, u.created_at, s.expires_at
+    `SELECT u.id, u.name, u.email, u.created_at, u.size_top, u.size_bottom, u.size_shoe, s.expires_at
        FROM sessions s
        JOIN users u ON u.id = s.user_id
       WHERE s.token = ? AND u.is_active = 1
@@ -152,6 +165,108 @@ export async function getUserByToken(token?: string): Promise<UserView> {
 
   await run("UPDATE sessions SET last_used_at = NOW() WHERE token = ?", [token]);
   return toView(session);
+}
+
+/** Cambia el nombre y el correo de la cuenta (409 si el correo ya es de otra). */
+export async function updateProfile(
+  userId: string,
+  input: { name: string; email: string },
+): Promise<UserView> {
+  const name = input.name.trim();
+  const email = input.email.trim().toLowerCase();
+
+  const problems: string[] = [];
+  if (name.length < MIN_NAME_LENGTH) {
+    problems.push(`El nombre debe tener al menos ${MIN_NAME_LENGTH} caracteres`);
+  }
+  if (name.length > 80) problems.push("El nombre no puede superar los 80 caracteres");
+  if (!EMAIL_PATTERN.test(email) || email.length > 160) {
+    problems.push(`"${input.email.trim()}" no es un correo válido`);
+  }
+  if (problems.length > 0) {
+    throw ApiError.badRequest("Revisa los datos del formulario", problems);
+  }
+
+  try {
+    await run("UPDATE users SET name = ?, email = ? WHERE id = ? AND is_active = 1", [
+      name,
+      email,
+      userId,
+    ]);
+  } catch (error) {
+    if (isDuplicateEntry(error)) {
+      throw ApiError.conflict(`Ya existe una cuenta con el correo "${email}"`);
+    }
+    throw error;
+  }
+
+  const [user] = await rows<UserRow>(
+    "SELECT id, name, email, password_hash, created_at, size_top, size_bottom, size_shoe FROM users WHERE id = ? LIMIT 1",
+    [userId],
+  );
+  if (!user) throw ApiError.notFound("La cuenta ya no existe");
+  return toView(user);
+}
+
+/**
+ * Cambia la contraseña comprobando antes la actual. Cierra el resto de
+ * sesiones abiertas (otros dispositivos) y mantiene la del token actual.
+ */
+export async function changePassword(
+  userId: string,
+  currentToken: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const [user] = await rows<UserRow>(
+    "SELECT id, name, email, password_hash, created_at, size_top, size_bottom, size_shoe FROM users WHERE id = ? LIMIT 1",
+    [userId],
+  );
+  if (!user || !verifyPassword(currentPassword, user.password_hash)) {
+    throw ApiError.badRequest("La contraseña actual no es correcta", [
+      "La contraseña actual no es correcta",
+    ]);
+  }
+  if (newPassword.length < MIN_PASSWORD_LENGTH) {
+    throw ApiError.badRequest("Revisa los datos del formulario", [
+      `La nueva contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres`,
+    ]);
+  }
+  if (newPassword === currentPassword) {
+    throw ApiError.badRequest("Revisa los datos del formulario", [
+      "La nueva contraseña debe ser distinta de la actual",
+    ]);
+  }
+
+  await run("UPDATE users SET password_hash = ? WHERE id = ?", [hashPassword(newPassword), userId]);
+  await run("DELETE FROM sessions WHERE user_id = ? AND token <> ?", [userId, currentToken]);
+}
+
+/** Guarda la talla habitual (null = sin indicar). Devuelve el perfil actualizado. */
+export async function updateSizes(
+  userId: string,
+  sizes: { top: string | null; bottom: string | null; shoe: string | null },
+): Promise<UserView> {
+  const problems: string[] = [];
+  if (sizes.top && !CLOTHING_SIZES.includes(sizes.top)) problems.push("Talla de arriba no válida");
+  if (sizes.bottom && !CLOTHING_SIZES.includes(sizes.bottom))
+    problems.push("Talla de abajo no válida");
+  if (sizes.shoe && !SHOE_SIZES.includes(sizes.shoe)) problems.push("Número de calzado no válido");
+  if (problems.length > 0) throw ApiError.badRequest("Revisa las tallas", problems);
+
+  await run("UPDATE users SET size_top = ?, size_bottom = ?, size_shoe = ? WHERE id = ?", [
+    sizes.top || null,
+    sizes.bottom || null,
+    sizes.shoe || null,
+    userId,
+  ]);
+
+  const [user] = await rows<UserRow>(
+    "SELECT id, name, email, password_hash, created_at, size_top, size_bottom, size_shoe FROM users WHERE id = ? LIMIT 1",
+    [userId],
+  );
+  if (!user) throw ApiError.notFound("La cuenta ya no existe");
+  return toView(user);
 }
 
 /** Cuentas registradas en la base de datos. */

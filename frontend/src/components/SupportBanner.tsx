@@ -5,7 +5,10 @@ export function SupportBanner() {
   return (
     <>
       {/* Atención al Cliente & Soporte Banner */}
-      <section className="w-full max-w-[1320px] mx-auto px-4 sm:px-6 md:px-8 py-4">
+      <section
+        className="w-full max-w-[1320px] mx-auto px-4 sm:px-6 md:px-8 py-4"
+        data-reveal="zoom"
+      >
         <div className="bg-gradient-to-r from-white to-slate-50 dark:from-slate-800 dark:to-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 md:p-8 flex flex-col lg:flex-row items-center justify-between gap-6 shadow-sm">
           <div className="flex items-start md:items-center gap-4">
             <div className="w-14 h-14 rounded-2xl bg-orange-100 dark:bg-primary/20 text-primary flex items-center justify-center shrink-0 shadow-sm">

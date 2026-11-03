@@ -21,7 +21,7 @@ export function TechBanner() {
         <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-secondary/20 rounded-full blur-3xl pointer-events-none"></div>
         <div className="max-w-[1320px] mx-auto px-4 sm:px-6 md:px-8 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
-            <div className="lg:col-span-7 space-y-6">
+            <div className="lg:col-span-7 space-y-6" data-reveal="left">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary/20 border border-secondary/40 text-blue-300 text-xs font-semibold">
                 <span className="material-symbols-outlined text-[16px]" data-icon="eco">
                   eco
@@ -42,6 +42,9 @@ export function TechBanner() {
                     Cupón de bienvenida exclusivo:
                   </span>
                   <span className="text-sm font-bold text-primary">15% de descuento adicional</span>
+                  <span className="text-[11px] text-slate-400 block mt-0.5">
+                    En tu primer pedido · escríbelo en la cesta antes de pagar
+                  </span>
                 </div>
                 <div className="flex items-center gap-2 bg-black/60 border border-primary/60 px-3.5 py-2 rounded-xl">
                   <span className="font-mono font-bold tracking-widest text-white">MOVE15</span>
@@ -62,7 +65,7 @@ export function TechBanner() {
                 </div>
               </div>
             </div>
-            <div className="lg:col-span-5 relative">
+            <div className="lg:col-span-5 relative" data-reveal="right">
               <div className="relative rounded-3xl overflow-hidden border border-white/15 shadow-2xl bg-white/5 backdrop-blur-md p-6 space-y-6">
                 <div className="aspect-video rounded-2xl overflow-hidden relative">
                   <div

@@ -14,12 +14,13 @@
 --
 --  QUÉ CREA
 --    1. Catálogo ....... categories, products, product_sizes, product_colors
---    2. Cuentas ........ users, sessions, favorites
+--    2. Cuentas ........ users, sessions, favorites, user_addresses
 --    3. Carrito ........ carts, cart_items
 --    4. Newsletter ..... newsletter_subscribers
 --    5. Pedidos ........ orders, order_items
+--    5 bis. Postventa .. returns, return_items, reviews
 --    6. Vistas ......... v_catalog, v_cart_totals
---    7. Datos .......... 7 categorías + 90 productos (38 de hombre, 29 de mujer, 23 unisex) + cuenta de ejemplo
+--    7. Datos .......... 7 categorías + 148 productos (62 de hombre, 56 de mujer, 30 unisex) + cuenta de ejemplo
 --
 --  El script es idempotente: se puede volver a ejecutar y deja la base de
 --  datos limpia (borra y recrea las tablas). Los datos transaccionales de
@@ -49,11 +50,15 @@ SET FOREIGN_KEY_CHECKS = 0;
 DROP VIEW IF EXISTS v_cart_totals;
 DROP VIEW IF EXISTS v_catalog;
 
+DROP TABLE IF EXISTS reviews;
+DROP TABLE IF EXISTS return_items;
+DROP TABLE IF EXISTS returns;
 DROP TABLE IF EXISTS order_items;
 DROP TABLE IF EXISTS orders;
 DROP TABLE IF EXISTS cart_items;
 DROP TABLE IF EXISTS carts;
 DROP TABLE IF EXISTS favorites;
+DROP TABLE IF EXISTS user_addresses;
 DROP TABLE IF EXISTS sessions;
 DROP TABLE IF EXISTS product_colors;
 DROP TABLE IF EXISTS product_sizes;
@@ -70,14 +75,14 @@ SET FOREIGN_KEY_CHECKS = 1;
 
 -- ----------------------------------------------------------------------------
 --  categories · disciplinas deportivas de la portada
---  items_count es el contador promocional que muestra la home; en una tienda
---  real se calcularía con COUNT(*) sobre products.
+--  items_count es un contador de referencia: la API (GET /api/categories) y la
+--  portada muestran el número real de productos activos con COUNT(*) sobre products.
 -- ----------------------------------------------------------------------------
 CREATE TABLE categories (
   id          INT UNSIGNED     NOT NULL AUTO_INCREMENT,
   slug        VARCHAR(60)      NOT NULL COMMENT 'Identificador para las URLs: fitness, running...',
   label       VARCHAR(90)      NOT NULL COMMENT 'Nombre visible en la web',
-  items_count INT UNSIGNED     NOT NULL DEFAULT 0 COMMENT 'Contador mostrado en la portada',
+  items_count INT UNSIGNED     NOT NULL DEFAULT 0 COMMENT 'Contador de referencia (la web cuenta los productos reales)',
   sort_order  TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Orden de aparición',
   created_at  TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at  TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -118,6 +123,7 @@ CREATE TABLE products (
   price         DECIMAL(10, 2)   NOT NULL,
   original_price DECIMAL(10, 2)   NULL COMMENT 'Precio antes de la rebaja; NULL si no está de oferta',
   rating         DECIMAL(2, 1)    NOT NULL DEFAULT 0.0 COMMENT 'Media de valoraciones (0-5)',
+  rating_base    DECIMAL(2, 1)    NOT NULL DEFAULT 0.0 COMMENT 'Valoración inicial del catálogo; se mezcla con las reseñas',
   badge_label    VARCHAR(40)      NULL COMMENT 'Texto del distintivo: Nuevo, Oferta -20%...',
   badge_tone     ENUM('nuevo', 'oferta', 'tecnico', 'tendencia', 'bestseller', 'soporte') NULL
                                   COMMENT 'Estilo semántico del distintivo (sin CSS en la BD)',
@@ -199,6 +205,9 @@ CREATE TABLE users (
   email         VARCHAR(160) NOT NULL,
   password_hash VARCHAR(255) NOT NULL COMMENT 'Formato scrypt: sal(hex):hash(hex)',
   role          ENUM('cliente', 'admin') NOT NULL DEFAULT 'cliente',
+  size_top      VARCHAR(10)  NULL COMMENT 'Talla de camisetas, tops, sudaderas y chaquetas',
+  size_bottom   VARCHAR(10)  NULL COMMENT 'Talla de pantalones, shorts y mallas',
+  size_shoe     VARCHAR(10)  NULL COMMENT 'Número de calzado: 38, 42...',
   is_active     TINYINT(1)   NOT NULL DEFAULT 1,
   created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -252,6 +261,37 @@ CREATE TABLE favorites (
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_0900_ai_ci
   COMMENT = 'Productos marcados como favoritos';
+
+-- ----------------------------------------------------------------------------
+--  user_addresses · direcciones de envío guardadas por el usuario
+--  Una puede ser la predeterminada: rellena el formulario de pago de Stripe.
+--  Tras el primer pago se guarda sola la dirección usada, si no había ninguna.
+--  Los pedidos copian la dirección: editar o borrar una no altera el histórico.
+-- ----------------------------------------------------------------------------
+CREATE TABLE user_addresses (
+  id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id      VARCHAR(20)     NOT NULL,
+  label        VARCHAR(40)     NULL COMMENT 'Casa, Trabajo...',
+  full_name    VARCHAR(80)     NOT NULL,
+  phone        VARCHAR(25)     NULL,
+  address_line VARCHAR(160)    NOT NULL,
+  city         VARCHAR(80)     NOT NULL,
+  postal_code  VARCHAR(12)     NOT NULL,
+  country      CHAR(2)         NOT NULL DEFAULT 'ES' COMMENT 'ES o PT, los países de envío',
+  is_default   TINYINT(1)      NOT NULL DEFAULT 0,
+  created_at   TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_addresses_user (user_id),
+  CONSTRAINT fk_addresses_user
+    FOREIGN KEY (user_id) REFERENCES users (id)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT chk_addresses_country CHECK (country IN ('ES', 'PT'))
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_0900_ai_ci
+  COMMENT = 'Direcciones de envío de cada cuenta';
+
 
 -- ============================================================================
 --  3. CARRITO
@@ -353,6 +393,7 @@ CREATE TABLE orders (
   subtotal            DECIMAL(10, 2)  NOT NULL DEFAULT 0,
   shipping_cost       DECIMAL(10, 2)  NOT NULL DEFAULT 0,
   discount            DECIMAL(10, 2)  NOT NULL DEFAULT 0,
+  coupon_code         VARCHAR(20)     NULL COMMENT 'Cupón aplicado: CLUB10 (socio) o MOVE15 (bienvenida)',
   total               DECIMAL(10, 2)  NOT NULL DEFAULT 0,
   currency            CHAR(3)         NOT NULL DEFAULT 'EUR',
   payment_method      VARCHAR(40)     NULL COMMENT 'tarjeta, paypal, bizum, contrarreembolso',
@@ -411,6 +452,96 @@ CREATE TABLE order_items (
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_0900_ai_ci
   COMMENT = 'Líneas de cada pedido';
+
+-- ============================================================================
+--  5 bis. POSTVENTA
+-- ============================================================================
+
+-- ----------------------------------------------------------------------------
+--  returns · solicitudes de devolución o cambio de talla
+--  Solo sobre pedidos entregados y dentro de los 30 días de garantía.
+--  refund_amount es lo que se devolverá (0 en los cambios de talla).
+-- ----------------------------------------------------------------------------
+CREATE TABLE returns (
+  id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  return_number VARCHAR(16)     NOT NULL COMMENT 'Número visible: DEV-000001',
+  order_id      BIGINT UNSIGNED NOT NULL,
+  user_id       VARCHAR(20)     NOT NULL,
+  type          ENUM('devolucion', 'cambio') NOT NULL,
+  status        ENUM('solicitada', 'aprobada', 'recibida', 'completada', 'rechazada')
+                                NOT NULL DEFAULT 'solicitada',
+  reason        ENUM('talla', 'defecto', 'no_esperado', 'otro') NOT NULL,
+  comments      VARCHAR(500)    NULL,
+  refund_amount DECIMAL(10, 2)  NOT NULL DEFAULT 0,
+  created_at    TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_returns_number (return_number),
+  KEY idx_returns_user (user_id),
+  KEY idx_returns_order (order_id),
+  CONSTRAINT fk_returns_order
+    FOREIGN KEY (order_id) REFERENCES orders (id)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT fk_returns_user
+    FOREIGN KEY (user_id) REFERENCES users (id)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT chk_returns_refund CHECK (refund_amount >= 0)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_0900_ai_ci
+  COMMENT = 'Devoluciones y cambios de talla';
+
+-- ----------------------------------------------------------------------------
+--  return_items · prendas incluidas en cada solicitud
+--  new_size solo se rellena en los cambios de talla.
+-- ----------------------------------------------------------------------------
+CREATE TABLE return_items (
+  id            BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  return_id     BIGINT UNSIGNED  NOT NULL,
+  order_item_id BIGINT UNSIGNED  NOT NULL,
+  quantity      TINYINT UNSIGNED NOT NULL,
+  new_size      VARCHAR(10)      NULL,
+  PRIMARY KEY (id),
+  KEY idx_return_items_return (return_id),
+  KEY idx_return_items_order_item (order_item_id),
+  CONSTRAINT fk_return_items_return
+    FOREIGN KEY (return_id) REFERENCES returns (id)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT fk_return_items_order_item
+    FOREIGN KEY (order_item_id) REFERENCES order_items (id)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT chk_return_items_quantity CHECK (quantity BETWEEN 1 AND 99)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_0900_ai_ci
+  COMMENT = 'Líneas de cada devolución o cambio';
+
+-- ----------------------------------------------------------------------------
+--  reviews · valoraciones de clientes que han comprado la prenda
+--  Una por usuario y producto (se puede editar). Al cambiar, se recalcula
+--  products.rating mezclando rating_base con la media de las reseñas.
+-- ----------------------------------------------------------------------------
+CREATE TABLE reviews (
+  user_id    VARCHAR(20)      NOT NULL,
+  product_id VARCHAR(20)      NOT NULL,
+  rating     TINYINT UNSIGNED NOT NULL,
+  title      VARCHAR(80)      NULL,
+  comment    VARCHAR(1000)    NULL,
+  created_at TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, product_id),
+  KEY idx_reviews_product (product_id),
+  CONSTRAINT fk_reviews_user
+    FOREIGN KEY (user_id) REFERENCES users (id)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT fk_reviews_product
+    FOREIGN KEY (product_id) REFERENCES products (id)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT chk_reviews_rating CHECK (rating BETWEEN 1 AND 5)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_0900_ai_ci
+  COMMENT = 'Reseñas de producto';
 
 -- ============================================================================
 --  6. VISTAS
@@ -1596,6 +1727,699 @@ INSERT INTO users (id, name, email, password_hash, role) VALUES
 
 COMMIT;
 
+-- ----------------------------------------------------------------------------
+--  7.6 Ampliación del catálogo (nex-91 a nex-148)
+--      58 productos más para que todas las disciplinas tengan una oferta amplia:
+--      yoga +12, fitness +10, crossfit +10, outdoor +10, futbol +8, running +4, athleisure +4.
+--      Reutilizan fotos existentes de prendas parecidas de la tienda.
+-- ----------------------------------------------------------------------------
+INSERT INTO products
+  (id, category_id, name, audience, garment_type, features, subtitle, description,
+   price, original_price, rating, badge_label, badge_tone, image_url, default_size, is_active)
+VALUES
+  ('nex-91', (SELECT id FROM categories WHERE slug = 'yoga'),
+   'Leggings Flow Rib Cintura Alta', 'mujer', 'compresion', 'cintura_alta,squatproof',
+   'Yoga · Vinyasa',
+   'Canalé suave de compresión ligera con cinturilla alta sin costuras que no se enrolla.',
+   52.95, NULL, 4.8, 'Nuevo', 'nuevo',
+   '/assets/images/mujer/nex-38-leggings-sculpt-motion.jpg', 'S', 1),
+
+  ('nex-92', (SELECT id FROM categories WHERE slug = 'yoga'),
+   'Top Cruzado Balance Soft', 'mujer', 'top', 'dryfit',
+   'Yoga · Hatha',
+   'Espalda cruzada con tirantes finos y soporte ligero para posturas de apertura.',
+   31.95, NULL, 4.7, NULL, NULL,
+   '/assets/images/mujer/nex-40-top-seamless-pureflow.jpg', 'S', 1),
+
+  ('nex-93', (SELECT id FROM categories WHERE slug = 'yoga'),
+   'Mallas 7/8 Pilates Sculpt', 'mujer', 'compresion', 'compresion,squatproof,cintura_alta',
+   'Pilates · Reformer',
+   'Largo 7/8 con agarre en la cintura y tejido opaco Squat-Proof que acompaña cada estiramiento.',
+   49.90, 59.90, 4.9, 'Oferta -17%', 'oferta',
+   '/assets/images/mujer/nex-46-mallas-night-pace.jpg', 'S', 1),
+
+  ('nex-94', (SELECT id FROM categories WHERE slug = 'yoga'),
+   'Sujetador Barre Seamless', 'mujer', 'top', 'antipilling',
+   'Barre · Pilates',
+   'Tejido seamless antibolitas con copas extraíbles y tirantes regulables.',
+   29.95, NULL, 4.6, 'Tacto Segunda Piel', 'soporte',
+   '/assets/images/mujer/nex-43-top-racerback-flow.jpg', 'S', 1),
+
+  ('nex-95', (SELECT id FROM categories WHERE slug = 'yoga'),
+   'Short Biker Yoga Hot', 'mujer', 'short', 'cintura_alta,squatproof',
+   'Yoga · Hot Yoga',
+   'Biker corto de secado rápido pensado para sesiones de yoga en sala caliente.',
+   27.95, NULL, 4.7, NULL, NULL,
+   '/assets/images/mujer/nex-44-biker-sculpt.jpg', 'S', 1),
+
+  ('nex-96', (SELECT id FROM categories WHERE slug = 'yoga'),
+   'Camiseta Cropped Flow Modal', 'mujer', 'camiseta', 'antipilling',
+   'Yoga · Restaurativo',
+   'Modal ultrasuave de corte cropped holgado que no se sube en las inversiones.',
+   26.95, NULL, 4.6, NULL, NULL,
+   '/assets/images/athleisure/nex-87-top-canale.jpg', 'S', 1),
+
+  ('nex-97', (SELECT id FROM categories WHERE slug = 'yoga'),
+   'Chaqueta Wrap Studio', 'mujer', 'chaqueta', 'french_terry',
+   'Yoga · Calentamiento',
+   'Chaqueta cruzada de french terry para llegar y salir de la sala sin perder calor.',
+   54.95, NULL, 4.8, 'Nuevo', 'nuevo',
+   '/assets/images/athleisure/nex-88-polar-rose.jpg', 'S', 1),
+
+  ('nex-98', (SELECT id FROM categories WHERE slug = 'yoga'),
+   'Jogger Relax Studio Wide', 'mujer', 'pantalon', 'french_terry,cintura_alta',
+   'Yoga · Post-clase',
+   'Pierna ancha y cintura alta elástica para estirar y descansar con la misma prenda.',
+   44.95, NULL, 4.7, NULL, NULL,
+   '/assets/images/athleisure/nex-85-wide-leg-oat.jpg', 'S', 1),
+
+  ('nex-99', (SELECT id FROM categories WHERE slug = 'yoga'),
+   'Pantalón Yoga Hombre Breathe', 'hombre', 'pantalon', 'dryfit',
+   'Yoga · Flow Masculino',
+   'Corte recto con entrepierna articulada y tejido elástico en cuatro direcciones.',
+   49.95, NULL, 4.6, NULL, NULL,
+   '/assets/images/hombre/nex-12-jogger.webp', 'M', 1),
+
+  ('nex-100', (SELECT id FROM categories WHERE slug = 'yoga'),
+   'Camiseta Yoga Hombre Organic', 'hombre', 'camiseta', 'antipilling',
+   'Yoga · Mindful',
+   'Algodón orgánico peinado con un toque de elastano para moverse sin tirones.',
+   29.95, NULL, 4.5, NULL, NULL,
+   '/assets/images/hombre/nex-25-camiseta-raglan.jpg', 'M', 1),
+
+  ('nex-101', (SELECT id FROM categories WHERE slug = 'yoga'),
+   'Mono Pilates One-Piece', 'mujer', 'vestido', 'compresion,squatproof',
+   'Pilates · Mat',
+   'Mono de una pieza con espalda abierta y compresión ligera de cadera a tobillo.',
+   69.95, 84.95, 4.8, 'Oferta -18%', 'oferta',
+   '/assets/images/athleisure/nex-89-vestido-midi.jpg', 'S', 1),
+
+  ('nex-102', (SELECT id FROM categories WHERE slug = 'yoga'),
+   'Bolsa Esterilla Studio Carry', 'unisex', 'accesorio', NULL,
+   'Yoga · Accesorios',
+   'Bolsa con compartimento para esterilla, bolsillo húmedo y correa acolchada.',
+   34.95, NULL, 4.7, NULL, NULL,
+   '/assets/images/athleisure/nex-84-bolsa-tote.jpg', 'Única', 1),
+
+  ('nex-103', (SELECT id FROM categories WHERE slug = 'fitness'),
+   'Camiseta Gym Pump Cover', 'hombre', 'camiseta', 'oversize',
+   'Fitness · Musculación',
+   'Oversize de gramaje pesado para calentar y cubrir el pump entre series.',
+   34.95, NULL, 4.7, 'Tendencia', 'tendencia',
+   '/assets/images/athleisure/nex-79-camiseta-boxy.jpg', 'M', 1),
+
+  ('nex-104', (SELECT id FROM categories WHERE slug = 'fitness'),
+   'Tirantes Gym Stringer Pro', 'hombre', 'camiseta', 'dryfit',
+   'Fitness · Musculación',
+   'Sisa profunda y espalda nadadora para trabajar hombros y dorsales con libertad.',
+   24.95, NULL, 4.6, NULL, NULL,
+   '/assets/images/hombre/nex-22-tank-wod.jpg', 'M', 1),
+
+  ('nex-105', (SELECT id FROM categories WHERE slug = 'fitness'),
+   'Short Gym Flex 7 Pulgadas', 'hombre', 'short', 'dryfit,bolsillos_zip',
+   'Fitness · Gimnasio',
+   'Tiro de 7 pulgadas con abertura lateral y bolsillo con cremallera para la taquilla.',
+   29.95, NULL, 4.7, NULL, NULL,
+   '/assets/images/hombre/nex-30-short-running-pocket.jpg', 'M', 1),
+
+  ('nex-106', (SELECT id FROM categories WHERE slug = 'fitness'),
+   'Jogger Gym Tapered Flex', 'hombre', 'pantalon', 'bolsillos_zip',
+   'Fitness · Gimnasio',
+   'Corte cónico con puño elástico y tejido flexible para sentadilla profunda.',
+   49.95, 59.95, 4.8, 'Oferta -17%', 'oferta',
+   '/assets/images/hombre/nex-12-jogger.webp', 'M', 1),
+
+  ('nex-107', (SELECT id FROM categories WHERE slug = 'fitness'),
+   'Sudadera Gym Hoodie Iron', 'hombre', 'sudadera', 'french_terry',
+   'Fitness · Calentamiento',
+   'Hoodie de french terry con capucha ajustable y bolsillo canguro.',
+   54.95, NULL, 4.8, 'Best Seller', 'bestseller',
+   '/assets/images/hombre/nex-24-hoodie-sin-mangas.jpg', 'M', 1),
+
+  ('nex-108', (SELECT id FROM categories WHERE slug = 'fitness'),
+   'Leggings Gym Contour', 'mujer', 'compresion', 'compresion,squatproof,cintura_alta',
+   'Fitness · Glúteo',
+   'Costuras contorneadas que realzan y compresión media para entrenamiento de fuerza.',
+   46.95, NULL, 4.9, 'Squat-Proof 360°', 'nuevo',
+   '/assets/images/mujer/nex-38-leggings-sculpt-motion.jpg', 'S', 1),
+
+  ('nex-109', (SELECT id FROM categories WHERE slug = 'fitness'),
+   'Top Gym Impact Strappy', 'mujer', 'top', 'compresion',
+   'Fitness · Alto Impacto',
+   'Sujeción alta con tirantes cruzados y forro de secado rápido.',
+   36.95, NULL, 4.7, 'Alto Soporte', 'soporte',
+   '/assets/images/mujer/nex-37-top-sculpt-core.jpg', 'S', 1),
+
+  ('nex-110', (SELECT id FROM categories WHERE slug = 'fitness'),
+   'Camiseta Gym Crop Lift', 'mujer', 'camiseta', 'dryfit',
+   'Fitness · Entrenamiento',
+   'Crop transpirable con espalda de rejilla para sesiones intensas.',
+   27.95, NULL, 4.6, NULL, NULL,
+   '/assets/images/mujer/nex-48-tirantes-wod-heather.jpg', 'S', 1),
+
+  ('nex-111', (SELECT id FROM categories WHERE slug = 'fitness'),
+   'Short Gym Doble Capa Femenino', 'mujer', 'short', 'dryfit,cintura_alta',
+   'Fitness · Cardio',
+   'Short con malla interior que no se sube en cinta, elíptica o saltos.',
+   29.95, NULL, 4.7, NULL, NULL,
+   '/assets/images/mujer/nex-41-short-doble-capa.jpg', 'S', 1),
+
+  ('nex-112', (SELECT id FROM categories WHERE slug = 'fitness'),
+   'Guantes Gym Grip Pro', 'unisex', 'accesorio', 'antiabrasion',
+   'Fitness · Accesorios',
+   'Palma acolchada antideslizante y muñequera de velcro para dominadas y peso libre.',
+   22.95, NULL, 4.5, NULL, NULL,
+   '/assets/images/futbol/nex-58-guantes-portero-grip.jpg', 'Única', 1),
+
+  ('nex-113', (SELECT id FROM categories WHERE slug = 'crossfit'),
+   'Camiseta WOD Burnout', 'hombre', 'camiseta', 'antiabrasion,dryfit',
+   'CrossFit · WOD',
+   'Tejido resistente al roce de la barra con paneles de ventilación en la espalda.',
+   32.95, NULL, 4.7, 'Anti-abrasión', 'nuevo',
+   '/assets/images/hombre/nex-25-camiseta-raglan.jpg', 'M', 1),
+
+  ('nex-114', (SELECT id FROM categories WHERE slug = 'crossfit'),
+   'Short WOD Ripstop Squat', 'hombre', 'short', 'ripstop,antiabrasion',
+   'CrossFit · Halterofilia',
+   'Ripstop elástico con entrepierna de refuerzo para sentadilla y snatch.',
+   39.95, NULL, 4.8, 'Micro-Ripstop 360°', 'nuevo',
+   '/assets/images/hombre/nex-11-short-2en1.webp', 'M', 1),
+
+  ('nex-115', (SELECT id FROM categories WHERE slug = 'crossfit'),
+   'Malla Larga Compresión Rope', 'hombre', 'compresion', 'compresion,antiabrasion',
+   'CrossFit · Rope Climb',
+   'Refuerzo en la espinilla para trepas de cuerda sin quemaduras.',
+   44.95, NULL, 4.7, NULL, NULL,
+   '/assets/images/hombre/nex-29-malla-3-4.jpg', 'M', 1),
+
+  ('nex-116', (SELECT id FROM categories WHERE slug = 'crossfit'),
+   'Tank WOD Muscle Mesh', 'hombre', 'camiseta', 'dryfit',
+   'CrossFit · Hiit',
+   'Tirantes con rejilla lateral para los metcons más largos.',
+   26.95, 31.95, 4.6, 'Oferta -16%', 'oferta',
+   '/assets/images/hombre/nex-28-tirantes-running.jpg', 'M', 1),
+
+  ('nex-117', (SELECT id FROM categories WHERE slug = 'crossfit'),
+   'Sudadera WOD Cut-Off', 'hombre', 'sudadera', 'french_terry',
+   'CrossFit · Calentamiento',
+   'Sin mangas y con capucha para calentar hombros antes del levantamiento.',
+   46.95, NULL, 4.7, NULL, NULL,
+   '/assets/images/hombre/nex-24-hoodie-sin-mangas.jpg', 'M', 1),
+
+  ('nex-118', (SELECT id FROM categories WHERE slug = 'crossfit'),
+   'Leggings WOD Grip Box', 'mujer', 'compresion', 'compresion,squatproof,antiabrasion',
+   'CrossFit · WOD',
+   'Squat-Proof con refuerzo en la espinilla y cintura que no se baja en los burpees.',
+   49.95, NULL, 4.9, 'Best Seller', 'bestseller',
+   '/assets/images/mujer/nex-46-mallas-night-pace.jpg', 'S', 1),
+
+  ('nex-119', (SELECT id FROM categories WHERE slug = 'crossfit'),
+   'Top WOD Power Racer', 'mujer', 'top', 'compresion,dryfit',
+   'CrossFit · Halterofilia',
+   'Espalda nadadora y soporte alto para cleans, jerks y double unders.',
+   34.95, NULL, 4.8, 'Soporte Alto', 'soporte',
+   '/assets/images/mujer/nex-43-top-racerback-flow.jpg', 'S', 1),
+
+  ('nex-120', (SELECT id FROM categories WHERE slug = 'crossfit'),
+   'Short WOD Booty Femenino', 'mujer', 'short', 'squatproof,cintura_alta',
+   'CrossFit · Box',
+   'Short corto de cintura alta para moverse sin límites en el box.',
+   27.95, NULL, 4.6, NULL, NULL,
+   '/assets/images/mujer/nex-44-biker-sculpt.jpg', 'S', 1),
+
+  ('nex-121', (SELECT id FROM categories WHERE slug = 'crossfit'),
+   'Camiseta WOD Muscle Femenina', 'mujer', 'camiseta', 'dryfit',
+   'CrossFit · Hiit',
+   'Sisa amplia y tejido ligero para entrenamientos de alta intensidad.',
+   28.95, NULL, 4.6, NULL, NULL,
+   '/assets/images/mujer/nex-48-tirantes-wod-heather.jpg', 'S', 1),
+
+  ('nex-122', (SELECT id FROM categories WHERE slug = 'crossfit'),
+   'Calcetines WOD Rope Guard', 'unisex', 'accesorio', 'antiabrasion',
+   'CrossFit · Accesorios',
+   'Caña alta acolchada que protege las espinillas en trepas y peso muerto.',
+   16.95, NULL, 4.5, NULL, NULL,
+   '/assets/images/running/nex-66-pack-calcetines.jpg', 'Única', 1),
+
+  ('nex-123', (SELECT id FROM categories WHERE slug = 'outdoor'),
+   'Chaqueta Impermeable Storm 3L', 'hombre', 'chaqueta', 'dwr,ripstop',
+   'Outdoor · Alta Montaña',
+   'Membrana de tres capas con costuras termoselladas y capucha compatible con casco.',
+   159.00, 189.00, 4.9, 'Oferta -16%', 'oferta',
+   '/assets/images/hombre/nex-33-softshell.jpg', 'M', 1),
+
+  ('nex-124', (SELECT id FROM categories WHERE slug = 'outdoor'),
+   'Forro Polar Grid Ascent', 'hombre', 'sudadera', 'antipilling',
+   'Outdoor · Capa Media',
+   'Polar de rejilla ligero que atrapa el calor y evacua la humedad en la subida.',
+   64.95, NULL, 4.7, NULL, NULL,
+   '/assets/images/hombre/nex-31-merino-half-zip.jpg', 'M', 1),
+
+  ('nex-125', (SELECT id FROM categories WHERE slug = 'outdoor'),
+   'Pantalón Convertible Trail Zip', 'hombre', 'pantalon', 'ripstop,dwr,bolsillos_zip',
+   'Outdoor · Trekking',
+   'Perneras desmontables con cremallera y tejido repelente al agua.',
+   74.95, NULL, 4.6, NULL, NULL,
+   '/assets/images/hombre/nex-10-pantalon-trekking.webp', 'M', 1),
+
+  ('nex-126', (SELECT id FROM categories WHERE slug = 'outdoor'),
+   'Camiseta Merino Trail 150', 'hombre', 'camiseta', 'antipilling',
+   'Outdoor · Trail',
+   'Lana merino de 150 g que regula la temperatura y no retiene olores en travesías largas.',
+   59.95, NULL, 4.8, 'Técnico', 'tecnico',
+   '/assets/images/hombre/nex-31-merino-half-zip.jpg', 'M', 1),
+
+  ('nex-127', (SELECT id FROM categories WHERE slug = 'outdoor'),
+   'Short Trekking Cargo Ripstop', 'hombre', 'short', 'ripstop,bolsillos_zip',
+   'Outdoor · Senderismo',
+   'Ripstop elástico con bolsillos cargo y cintura ajustable.',
+   44.95, NULL, 4.6, NULL, NULL,
+   '/assets/images/running/nex-63-short-2en1-trail.jpg', 'M', 1),
+
+  ('nex-128', (SELECT id FROM categories WHERE slug = 'outdoor'),
+   'Chaqueta Plumón Ligera Summit', 'mujer', 'chaqueta', 'dwr',
+   'Outdoor · Montaña',
+   'Relleno sintético compresible que cabe en su propio bolsillo.',
+   119.00, NULL, 4.8, 'Nuevo', 'nuevo',
+   '/assets/images/mujer/nex-49-softshell-summit.jpg', 'S', 1),
+
+  ('nex-129', (SELECT id FROM categories WHERE slug = 'outdoor'),
+   'Mallas Trekking Thermal', 'mujer', 'pantalon', 'dwr,antiabrasion,cintura_alta',
+   'Outdoor · Invierno',
+   'Interior perchado térmico y paneles anti-roce en rodillas.',
+   64.95, NULL, 4.7, 'Micro-Thermal', 'nuevo',
+   '/assets/images/mujer/nex-50-pantalon-trekking.jpg', 'S', 1),
+
+  ('nex-130', (SELECT id FROM categories WHERE slug = 'outdoor'),
+   'Camiseta Trail Femenina UV', 'mujer', 'camiseta', 'dryfit',
+   'Outdoor · Trail',
+   'Protección solar UPF 50 y tejido de secado rápido para rutas de verano.',
+   34.95, NULL, 4.6, NULL, NULL,
+   '/assets/images/running/nex-61-half-zip-night-run.jpg', 'S', 1),
+
+  ('nex-131', (SELECT id FROM categories WHERE slug = 'outdoor'),
+   'Chaleco Trail Sherpa Hike', 'unisex', 'chaqueta', 'antipilling',
+   'Outdoor · Capa Media',
+   'Chaleco de borreguillo para las paradas en ruta y el refugio.',
+   69.95, NULL, 4.7, NULL, NULL,
+   '/assets/images/athleisure/nex-83-chaleco-sherpa.jpg', 'M', 1),
+
+  ('nex-132', (SELECT id FROM categories WHERE slug = 'outdoor'),
+   'Bastones Trekking Carbon Fold', 'unisex', 'accesorio', NULL,
+   'Outdoor · Accesorios',
+   'Bastones plegables de carbono de 260 g con empuñadura de corcho.',
+   89.95, 109.95, 4.8, 'Oferta -18%', 'oferta',
+   '/assets/images/running/nex-76-bastones-trail.jpg', 'Única', 1),
+
+  ('nex-133', (SELECT id FROM categories WHERE slug = 'futbol'),
+   'Camiseta Away Match Pro', 'hombre', 'camiseta', 'dryfit',
+   'Fútbol · Segunda Equipación',
+   'Versión visitante de la Match Pro con tejido panal y cuello en pico.',
+   49.95, NULL, 4.8, 'Oficial Match', 'nuevo',
+   '/assets/images/futbol/nex-54-camiseta-match-striker.jpg', 'M', 1),
+
+  ('nex-134', (SELECT id FROM categories WHERE slug = 'futbol'),
+   'Camiseta Portero Long Sleeve', 'hombre', 'camiseta', 'dryfit,antiabrasion',
+   'Fútbol · Portero',
+   'Manga larga acolchada en codos para estiradas sin rozaduras.',
+   54.95, NULL, 4.7, NULL, NULL,
+   '/assets/images/hombre/nex-07-camiseta-match.webp', 'M', 1),
+
+  ('nex-135', (SELECT id FROM categories WHERE slug = 'futbol'),
+   'Short Portero Acolchado', 'hombre', 'short', 'antiabrasion',
+   'Fútbol · Portero',
+   'Protecciones laterales en cadera y muslo para caídas en césped o tierra.',
+   36.95, NULL, 4.6, NULL, NULL,
+   '/assets/images/hombre/nex-20-short-match.jpg', 'M', 1),
+
+  ('nex-136', (SELECT id FROM categories WHERE slug = 'futbol'),
+   'Chubasquero Rain Pitch', 'unisex', 'chaqueta', 'dwr',
+   'Fútbol · Entrenamiento',
+   'Cortavientos repelente al agua para entrenar con lluvia sin pasar frío.',
+   59.95, 69.95, 4.7, 'Oferta -14%', 'oferta',
+   '/assets/images/hombre/nex-09-cortavientos.webp', 'M', 1),
+
+  ('nex-137', (SELECT id FROM categories WHERE slug = 'futbol'),
+   'Short Match Femenino Volta', 'mujer', 'short', 'dryfit',
+   'Fútbol · Partido',
+   'Short de partido con corte femenino y cintura elástica con cordón.',
+   32.00, NULL, 4.7, NULL, NULL,
+   '/assets/images/mujer/nex-41-short-doble-capa.jpg', 'S', 1),
+
+  ('nex-138', (SELECT id FROM categories WHERE slug = 'futbol'),
+   'Pantalón Entreno Femenino Tapered', 'mujer', 'pantalon', 'bolsillos_zip',
+   'Fútbol Femenino · Entrenamiento',
+   'Pernera cónica con cremallera en el tobillo para quitarlo con las botas puestas.',
+   44.95, NULL, 4.8, 'Fit Cónico 3D', 'tecnico',
+   '/assets/images/futbol/nex-56-pantalon-training-tapered.jpg', 'S', 1),
+
+  ('nex-139', (SELECT id FROM categories WHERE slug = 'futbol'),
+   'Sudadera Entreno Femenina Pressing', 'mujer', 'sudadera', 'french_terry',
+   'Fútbol Femenino · Calentamiento',
+   'Medio cuello con cremallera y puños con hueco para el pulgar.',
+   46.95, NULL, 4.7, NULL, NULL,
+   '/assets/images/mujer/nex-52-futbol-half-zip.jpg', 'S', 1),
+
+  ('nex-140', (SELECT id FROM categories WHERE slug = 'futbol'),
+   'Espinilleras Striker Light', 'unisex', 'accesorio', NULL,
+   'Fútbol · Protección',
+   'Carcasa de fibra ligera con espuma de impacto y funda de compresión.',
+   24.95, NULL, 4.6, NULL, NULL,
+   '/assets/images/futbol/nex-59-medias-compresion-match.jpg', 'Única', 1),
+
+  ('nex-141', (SELECT id FROM categories WHERE slug = 'running'),
+   'Camiseta Running Ultralight 90g', 'hombre', 'camiseta', 'dryfit,reflectante',
+   'Running · Competición',
+   'Solo 90 g con detalles reflectantes para correr de noche.',
+   34.95, NULL, 4.8, 'Tejido Transpirable', 'nuevo',
+   '/assets/images/hombre/nex-28-tirantes-running.jpg', 'M', 1),
+
+  ('nex-142', (SELECT id FROM categories WHERE slug = 'running'),
+   'Cortavientos Running Packable', 'hombre', 'chaqueta', 'dwr,reflectante',
+   'Running · Clima Adverso',
+   'Se pliega en su bolsillo trasero y repele la lluvia ligera.',
+   64.95, 74.95, 4.7, 'Oferta -13%', 'oferta',
+   '/assets/images/hombre/nex-09-cortavientos.webp', 'M', 1),
+
+  ('nex-143', (SELECT id FROM categories WHERE slug = 'running'),
+   'Mallas Running Femeninas Pocket', 'mujer', 'compresion', 'compresion,bolsillos_zip,reflectante',
+   'Running · Larga Distancia',
+   'Bolsillos laterales para el móvil y geles, con logos reflectantes.',
+   54.95, NULL, 4.9, 'Best Seller', 'bestseller',
+   '/assets/images/mujer/nex-46-mallas-night-pace.jpg', 'S', 1),
+
+  ('nex-144', (SELECT id FROM categories WHERE slug = 'running'),
+   'Camiseta Running Femenina Breeze', 'mujer', 'camiseta', 'dryfit',
+   'Running · Entrenamiento',
+   'Corte holgado con espalda de rejilla para los rodajes de verano.',
+   29.95, NULL, 4.7, NULL, NULL,
+   '/assets/images/mujer/nex-45-tirantes-aero-run.jpg', 'S', 1),
+
+  ('nex-145', (SELECT id FROM categories WHERE slug = 'athleisure'),
+   'Sudadera Hoodie Heavyweight Hombre', 'hombre', 'sudadera', 'french_terry,oversize',
+   'Athleisure · Casual',
+   'Algodón de 450 g con hombro caído y capucha de doble capa.',
+   64.95, NULL, 4.8, 'Tendencia', 'tendencia',
+   '/assets/images/athleisure/nex-82-hoodie-pure-relax.jpg', 'M', 1),
+
+  ('nex-146', (SELECT id FROM categories WHERE slug = 'athleisure'),
+   'Polo Piqué Tech Stretch', 'hombre', 'camiseta', 'antipilling',
+   'Athleisure · Smart Casual',
+   'Piqué elástico que no se arruga, del gimnasio a la oficina.',
+   39.95, NULL, 4.6, NULL, NULL,
+   '/assets/images/athleisure/nex-34-polo-pique.jpg', 'M', 1),
+
+  ('nex-147', (SELECT id FROM categories WHERE slug = 'athleisure'),
+   'Jogger Fleece Femenino Cozy', 'mujer', 'pantalon', 'french_terry',
+   'Athleisure · Confort',
+   'Interior perchado ultrasuave con bolsillos laterales profundos.',
+   46.95, NULL, 4.8, NULL, NULL,
+   '/assets/images/mujer/nex-51-jogger-fleece.jpg', 'S', 1),
+
+  ('nex-148', (SELECT id FROM categories WHERE slug = 'athleisure'),
+   'Sudadera Zip Hoodie Femenina Daily', 'mujer', 'sudadera', 'french_terry',
+   'Athleisure · Diario',
+   'Cremallera completa y corte ligeramente entallado para el día a día.',
+   54.95, 64.95, 4.7, 'Oferta -15%', 'oferta',
+   '/assets/images/mujer/nex-53-zip-hoodie.jpg', 'S', 1);
+
+INSERT INTO product_sizes (product_id, size, stock, sort_order) VALUES
+  ('nex-91', 'XS', 6, 1), ('nex-91', 'S', 11, 2), ('nex-91', 'M', 16, 3), ('nex-91', 'L', 21, 4), ('nex-91', 'XL', 26, 5),
+  ('nex-92', 'XS', 13, 1), ('nex-92', 'S', 18, 2), ('nex-92', 'M', 23, 3), ('nex-92', 'L', 28, 4), ('nex-92', 'XL', 9, 5),
+  ('nex-93', 'XS', 20, 1), ('nex-93', 'S', 25, 2), ('nex-93', 'M', 6, 3), ('nex-93', 'L', 11, 4), ('nex-93', 'XL', 16, 5),
+  ('nex-94', 'XS', 27, 1), ('nex-94', 'S', 8, 2), ('nex-94', 'M', 13, 3), ('nex-94', 'L', 18, 4), ('nex-94', 'XL', 23, 5),
+  ('nex-95', 'XS', 10, 1), ('nex-95', 'S', 15, 2), ('nex-95', 'M', 20, 3), ('nex-95', 'L', 25, 4), ('nex-95', 'XL', 6, 5),
+  ('nex-96', 'XS', 17, 1), ('nex-96', 'S', 22, 2), ('nex-96', 'M', 27, 3), ('nex-96', 'L', 8, 4), ('nex-96', 'XL', 13, 5),
+  ('nex-97', 'XS', 24, 1), ('nex-97', 'S', 29, 2), ('nex-97', 'M', 10, 3), ('nex-97', 'L', 15, 4), ('nex-97', 'XL', 20, 5),
+  ('nex-98', 'XS', 7, 1), ('nex-98', 'S', 12, 2), ('nex-98', 'M', 17, 3), ('nex-98', 'L', 22, 4), ('nex-98', 'XL', 27, 5),
+  ('nex-99', 'S', 14, 1), ('nex-99', 'M', 19, 2), ('nex-99', 'L', 24, 3), ('nex-99', 'XL', 29, 4), ('nex-99', 'XXL', 10, 5),
+  ('nex-100', 'S', 21, 1), ('nex-100', 'M', 26, 2), ('nex-100', 'L', 7, 3), ('nex-100', 'XL', 12, 4), ('nex-100', 'XXL', 17, 5),
+  ('nex-101', 'XS', 28, 1), ('nex-101', 'S', 9, 2), ('nex-101', 'M', 14, 3), ('nex-101', 'L', 19, 4), ('nex-101', 'XL', 24, 5),
+  ('nex-102', 'Única', 40, 1),
+  ('nex-103', 'S', 18, 1), ('nex-103', 'M', 23, 2), ('nex-103', 'L', 28, 3), ('nex-103', 'XL', 9, 4), ('nex-103', 'XXL', 14, 5),
+  ('nex-104', 'S', 25, 1), ('nex-104', 'M', 6, 2), ('nex-104', 'L', 11, 3), ('nex-104', 'XL', 16, 4), ('nex-104', 'XXL', 21, 5),
+  ('nex-105', 'S', 8, 1), ('nex-105', 'M', 13, 2), ('nex-105', 'L', 18, 3), ('nex-105', 'XL', 23, 4), ('nex-105', 'XXL', 28, 5),
+  ('nex-106', 'S', 15, 1), ('nex-106', 'M', 20, 2), ('nex-106', 'L', 25, 3), ('nex-106', 'XL', 6, 4), ('nex-106', 'XXL', 11, 5),
+  ('nex-107', 'S', 22, 1), ('nex-107', 'M', 27, 2), ('nex-107', 'L', 8, 3), ('nex-107', 'XL', 13, 4), ('nex-107', 'XXL', 18, 5),
+  ('nex-108', 'XS', 29, 1), ('nex-108', 'S', 10, 2), ('nex-108', 'M', 15, 3), ('nex-108', 'L', 20, 4), ('nex-108', 'XL', 25, 5),
+  ('nex-109', 'XS', 12, 1), ('nex-109', 'S', 17, 2), ('nex-109', 'M', 22, 3), ('nex-109', 'L', 27, 4), ('nex-109', 'XL', 8, 5),
+  ('nex-110', 'XS', 19, 1), ('nex-110', 'S', 24, 2), ('nex-110', 'M', 29, 3), ('nex-110', 'L', 10, 4), ('nex-110', 'XL', 15, 5),
+  ('nex-111', 'XS', 26, 1), ('nex-111', 'S', 7, 2), ('nex-111', 'M', 12, 3), ('nex-111', 'L', 17, 4), ('nex-111', 'XL', 22, 5),
+  ('nex-112', 'Única', 40, 1),
+  ('nex-113', 'S', 16, 1), ('nex-113', 'M', 21, 2), ('nex-113', 'L', 26, 3), ('nex-113', 'XL', 7, 4), ('nex-113', 'XXL', 12, 5),
+  ('nex-114', 'S', 23, 1), ('nex-114', 'M', 28, 2), ('nex-114', 'L', 9, 3), ('nex-114', 'XL', 14, 4), ('nex-114', 'XXL', 19, 5),
+  ('nex-115', 'S', 6, 1), ('nex-115', 'M', 11, 2), ('nex-115', 'L', 16, 3), ('nex-115', 'XL', 21, 4), ('nex-115', 'XXL', 26, 5),
+  ('nex-116', 'S', 13, 1), ('nex-116', 'M', 18, 2), ('nex-116', 'L', 23, 3), ('nex-116', 'XL', 28, 4), ('nex-116', 'XXL', 9, 5),
+  ('nex-117', 'S', 20, 1), ('nex-117', 'M', 25, 2), ('nex-117', 'L', 6, 3), ('nex-117', 'XL', 11, 4), ('nex-117', 'XXL', 16, 5),
+  ('nex-118', 'XS', 27, 1), ('nex-118', 'S', 8, 2), ('nex-118', 'M', 13, 3), ('nex-118', 'L', 18, 4), ('nex-118', 'XL', 23, 5),
+  ('nex-119', 'XS', 10, 1), ('nex-119', 'S', 15, 2), ('nex-119', 'M', 20, 3), ('nex-119', 'L', 25, 4), ('nex-119', 'XL', 6, 5),
+  ('nex-120', 'XS', 17, 1), ('nex-120', 'S', 22, 2), ('nex-120', 'M', 27, 3), ('nex-120', 'L', 8, 4), ('nex-120', 'XL', 13, 5),
+  ('nex-121', 'XS', 24, 1), ('nex-121', 'S', 29, 2), ('nex-121', 'M', 10, 3), ('nex-121', 'L', 15, 4), ('nex-121', 'XL', 20, 5),
+  ('nex-122', 'Única', 40, 1),
+  ('nex-123', 'S', 14, 1), ('nex-123', 'M', 19, 2), ('nex-123', 'L', 24, 3), ('nex-123', 'XL', 29, 4), ('nex-123', 'XXL', 10, 5),
+  ('nex-124', 'S', 21, 1), ('nex-124', 'M', 26, 2), ('nex-124', 'L', 7, 3), ('nex-124', 'XL', 12, 4), ('nex-124', 'XXL', 17, 5),
+  ('nex-125', 'S', 28, 1), ('nex-125', 'M', 9, 2), ('nex-125', 'L', 14, 3), ('nex-125', 'XL', 19, 4), ('nex-125', 'XXL', 24, 5),
+  ('nex-126', 'S', 11, 1), ('nex-126', 'M', 16, 2), ('nex-126', 'L', 21, 3), ('nex-126', 'XL', 26, 4), ('nex-126', 'XXL', 7, 5),
+  ('nex-127', 'S', 18, 1), ('nex-127', 'M', 23, 2), ('nex-127', 'L', 28, 3), ('nex-127', 'XL', 9, 4), ('nex-127', 'XXL', 14, 5),
+  ('nex-128', 'XS', 25, 1), ('nex-128', 'S', 6, 2), ('nex-128', 'M', 11, 3), ('nex-128', 'L', 16, 4), ('nex-128', 'XL', 21, 5),
+  ('nex-129', 'XS', 8, 1), ('nex-129', 'S', 13, 2), ('nex-129', 'M', 18, 3), ('nex-129', 'L', 23, 4), ('nex-129', 'XL', 28, 5),
+  ('nex-130', 'XS', 15, 1), ('nex-130', 'S', 20, 2), ('nex-130', 'M', 25, 3), ('nex-130', 'L', 6, 4), ('nex-130', 'XL', 11, 5),
+  ('nex-131', 'XS', 22, 1), ('nex-131', 'S', 27, 2), ('nex-131', 'M', 8, 3), ('nex-131', 'L', 13, 4), ('nex-131', 'XL', 18, 5),
+  ('nex-132', 'Única', 40, 1),
+  ('nex-133', 'S', 12, 1), ('nex-133', 'M', 17, 2), ('nex-133', 'L', 22, 3), ('nex-133', 'XL', 27, 4), ('nex-133', 'XXL', 8, 5),
+  ('nex-134', 'S', 19, 1), ('nex-134', 'M', 24, 2), ('nex-134', 'L', 29, 3), ('nex-134', 'XL', 10, 4), ('nex-134', 'XXL', 15, 5),
+  ('nex-135', 'S', 26, 1), ('nex-135', 'M', 7, 2), ('nex-135', 'L', 12, 3), ('nex-135', 'XL', 17, 4), ('nex-135', 'XXL', 22, 5),
+  ('nex-136', 'XS', 9, 1), ('nex-136', 'S', 14, 2), ('nex-136', 'M', 19, 3), ('nex-136', 'L', 24, 4), ('nex-136', 'XL', 29, 5),
+  ('nex-137', 'XS', 16, 1), ('nex-137', 'S', 21, 2), ('nex-137', 'M', 26, 3), ('nex-137', 'L', 7, 4), ('nex-137', 'XL', 12, 5),
+  ('nex-138', 'XS', 23, 1), ('nex-138', 'S', 28, 2), ('nex-138', 'M', 9, 3), ('nex-138', 'L', 14, 4), ('nex-138', 'XL', 19, 5),
+  ('nex-139', 'XS', 6, 1), ('nex-139', 'S', 11, 2), ('nex-139', 'M', 16, 3), ('nex-139', 'L', 21, 4), ('nex-139', 'XL', 26, 5),
+  ('nex-140', 'Única', 40, 1),
+  ('nex-141', 'S', 20, 1), ('nex-141', 'M', 25, 2), ('nex-141', 'L', 6, 3), ('nex-141', 'XL', 11, 4), ('nex-141', 'XXL', 16, 5),
+  ('nex-142', 'S', 27, 1), ('nex-142', 'M', 8, 2), ('nex-142', 'L', 13, 3), ('nex-142', 'XL', 18, 4), ('nex-142', 'XXL', 23, 5),
+  ('nex-143', 'XS', 10, 1), ('nex-143', 'S', 15, 2), ('nex-143', 'M', 20, 3), ('nex-143', 'L', 25, 4), ('nex-143', 'XL', 6, 5),
+  ('nex-144', 'XS', 17, 1), ('nex-144', 'S', 22, 2), ('nex-144', 'M', 27, 3), ('nex-144', 'L', 8, 4), ('nex-144', 'XL', 13, 5),
+  ('nex-145', 'S', 24, 1), ('nex-145', 'M', 29, 2), ('nex-145', 'L', 10, 3), ('nex-145', 'XL', 15, 4), ('nex-145', 'XXL', 20, 5),
+  ('nex-146', 'S', 7, 1), ('nex-146', 'M', 12, 2), ('nex-146', 'L', 17, 3), ('nex-146', 'XL', 22, 4), ('nex-146', 'XXL', 27, 5),
+  ('nex-147', 'XS', 14, 1), ('nex-147', 'S', 19, 2), ('nex-147', 'M', 24, 3), ('nex-147', 'L', 29, 4), ('nex-147', 'XL', 10, 5),
+  ('nex-148', 'XS', 21, 1), ('nex-148', 'S', 26, 2), ('nex-148', 'M', 7, 3), ('nex-148', 'L', 12, 4), ('nex-148', 'XL', 17, 5);
+
+INSERT INTO product_colors (product_id, color_hex, color_name, has_border, sort_order) VALUES
+  ('nex-91', '#111827', 'Negro', 0, 1),
+  ('nex-91', '#C4999B', 'Rosa palo', 0, 2),
+  ('nex-91', '#AE3200', 'Terracota', 0, 3),
+
+  ('nex-92', '#C4999B', 'Rosa palo', 0, 1),
+  ('nex-92', '#E5E0D8', 'Arena', 1, 2),
+  ('nex-92', '#111827', 'Negro', 0, 3),
+
+  ('nex-93', '#111827', 'Negro', 0, 1),
+  ('nex-93', '#1E293B', 'Azul noche', 0, 2),
+
+  ('nex-94', '#E5E0D8', 'Arena', 1, 1),
+  ('nex-94', '#C4999B', 'Rosa palo', 0, 2),
+  ('nex-94', '#AE3200', 'Terracota', 0, 3),
+
+  ('nex-95', '#111827', 'Negro', 0, 1),
+  ('nex-95', '#AE3200', 'Terracota', 0, 2),
+
+  ('nex-96', '#E5E0D8', 'Arena', 1, 1),
+  ('nex-96', '#C4999B', 'Rosa palo', 0, 2),
+  ('nex-96', '#111827', 'Negro', 0, 3),
+
+  ('nex-97', '#C4999B', 'Rosa palo', 0, 1),
+  ('nex-97', '#E5E0D8', 'Arena', 1, 2),
+
+  ('nex-98', '#E5E0D8', 'Arena', 1, 1),
+  ('nex-98', '#374151', 'Grafito', 0, 2),
+
+  ('nex-99', '#374151', 'Grafito', 0, 1),
+  ('nex-99', '#1E293B', 'Azul noche', 0, 2),
+
+  ('nex-100', '#E5E0D8', 'Arena', 1, 1),
+  ('nex-100', '#4B5D3A', 'Verde oliva', 0, 2),
+  ('nex-100', '#374151', 'Grafito', 0, 3),
+
+  ('nex-101', '#111827', 'Negro', 0, 1),
+  ('nex-101', '#AE3200', 'Terracota', 0, 2),
+
+  ('nex-102', '#E5E0D8', 'Arena', 1, 1),
+  ('nex-102', '#1E293B', 'Azul noche', 0, 2),
+
+  ('nex-103', '#111827', 'Negro', 0, 1),
+  ('nex-103', '#374151', 'Grafito', 0, 2),
+  ('nex-103', '#E5E0D8', 'Arena', 1, 3),
+
+  ('nex-104', '#111827', 'Negro', 0, 1),
+  ('nex-104', '#FF5A1F', 'Naranja NEXFIT', 0, 2),
+  ('nex-104', '#1E293B', 'Azul noche', 0, 3),
+
+  ('nex-105', '#111827', 'Negro', 0, 1),
+  ('nex-105', '#374151', 'Grafito', 0, 2),
+  ('nex-105', '#4B5D3A', 'Verde oliva', 0, 3),
+
+  ('nex-106', '#111827', 'Negro', 0, 1),
+  ('nex-106', '#374151', 'Grafito', 0, 2),
+
+  ('nex-107', '#111827', 'Negro', 0, 1),
+  ('nex-107', '#1E293B', 'Azul noche', 0, 2),
+  ('nex-107', '#374151', 'Grafito', 0, 3),
+
+  ('nex-108', '#111827', 'Negro', 0, 1),
+  ('nex-108', '#AE3200', 'Terracota', 0, 2),
+  ('nex-108', '#1E293B', 'Azul noche', 0, 3),
+
+  ('nex-109', '#111827', 'Negro', 0, 1),
+  ('nex-109', '#FF5A1F', 'Naranja NEXFIT', 0, 2),
+  ('nex-109', '#C4999B', 'Rosa palo', 0, 3),
+
+  ('nex-110', '#374151', 'Grafito', 0, 1),
+  ('nex-110', '#C4999B', 'Rosa palo', 0, 2),
+  ('nex-110', '#111827', 'Negro', 0, 3),
+
+  ('nex-111', '#111827', 'Negro', 0, 1),
+  ('nex-111', '#1E293B', 'Azul noche', 0, 2),
+
+  ('nex-112', '#111827', 'Negro', 0, 1),
+
+  ('nex-113', '#111827', 'Negro', 0, 1),
+  ('nex-113', '#FF5A1F', 'Naranja NEXFIT', 0, 2),
+  ('nex-113', '#374151', 'Grafito', 0, 3),
+
+  ('nex-114', '#111827', 'Negro', 0, 1),
+  ('nex-114', '#374151', 'Grafito', 0, 2),
+  ('nex-114', '#4B5D3A', 'Verde oliva', 0, 3),
+
+  ('nex-115', '#111827', 'Negro', 0, 1),
+  ('nex-115', '#1E293B', 'Azul noche', 0, 2),
+
+  ('nex-116', '#374151', 'Grafito', 0, 1),
+  ('nex-116', '#FF5A1F', 'Naranja NEXFIT', 0, 2),
+  ('nex-116', '#FFFFFF', 'Blanco', 1, 3),
+
+  ('nex-117', '#111827', 'Negro', 0, 1),
+  ('nex-117', '#374151', 'Grafito', 0, 2),
+
+  ('nex-118', '#111827', 'Negro', 0, 1),
+  ('nex-118', '#AE3200', 'Terracota', 0, 2),
+  ('nex-118', '#1E293B', 'Azul noche', 0, 3),
+
+  ('nex-119', '#111827', 'Negro', 0, 1),
+  ('nex-119', '#FF5A1F', 'Naranja NEXFIT', 0, 2),
+  ('nex-119', '#C4999B', 'Rosa palo', 0, 3),
+
+  ('nex-120', '#111827', 'Negro', 0, 1),
+  ('nex-120', '#AE3200', 'Terracota', 0, 2),
+  ('nex-120', '#2563EB', 'Azul', 0, 3),
+
+  ('nex-121', '#374151', 'Grafito', 0, 1),
+  ('nex-121', '#C4999B', 'Rosa palo', 0, 2),
+  ('nex-121', '#FFFFFF', 'Blanco', 1, 3),
+
+  ('nex-122', '#111827', 'Negro', 0, 1),
+  ('nex-122', '#FFFFFF', 'Blanco', 1, 2),
+  ('nex-122', '#FF5A1F', 'Naranja NEXFIT', 0, 3),
+
+  ('nex-123', '#FF5A1F', 'Naranja NEXFIT', 0, 1),
+  ('nex-123', '#1E293B', 'Azul noche', 0, 2),
+  ('nex-123', '#4B5D3A', 'Verde oliva', 0, 3),
+
+  ('nex-124', '#4B5D3A', 'Verde oliva', 0, 1),
+  ('nex-124', '#374151', 'Grafito', 0, 2),
+  ('nex-124', '#FF5A1F', 'Naranja NEXFIT', 0, 3),
+
+  ('nex-125', '#374151', 'Grafito', 0, 1),
+  ('nex-125', '#4B5D3A', 'Verde oliva', 0, 2),
+  ('nex-125', '#E5E0D8', 'Arena', 1, 3),
+
+  ('nex-126', '#1E293B', 'Azul noche', 0, 1),
+  ('nex-126', '#4B5D3A', 'Verde oliva', 0, 2),
+  ('nex-126', '#374151', 'Grafito', 0, 3),
+
+  ('nex-127', '#4B5D3A', 'Verde oliva', 0, 1),
+  ('nex-127', '#374151', 'Grafito', 0, 2),
+  ('nex-127', '#E5E0D8', 'Arena', 1, 3),
+
+  ('nex-128', '#AE3200', 'Terracota', 0, 1),
+  ('nex-128', '#1E293B', 'Azul noche', 0, 2),
+  ('nex-128', '#111827', 'Negro', 0, 3),
+
+  ('nex-129', '#111827', 'Negro', 0, 1),
+  ('nex-129', '#1E293B', 'Azul noche', 0, 2),
+
+  ('nex-130', '#2563EB', 'Azul', 0, 1),
+  ('nex-130', '#C4999B', 'Rosa palo', 0, 2),
+  ('nex-130', '#FFFFFF', 'Blanco', 1, 3),
+
+  ('nex-131', '#E5E0D8', 'Arena', 1, 1),
+  ('nex-131', '#374151', 'Grafito', 0, 2),
+
+  ('nex-132', '#111827', 'Negro', 0, 1),
+  ('nex-132', '#FF5A1F', 'Naranja NEXFIT', 0, 2),
+
+  ('nex-133', '#FFFFFF', 'Blanco', 1, 1),
+  ('nex-133', '#1E3A8A', 'Azul marino', 0, 2),
+  ('nex-133', '#FF5A1F', 'Naranja NEXFIT', 0, 3),
+
+  ('nex-134', '#FF5A1F', 'Naranja NEXFIT', 0, 1),
+  ('nex-134', '#4B5D3A', 'Verde oliva', 0, 2),
+  ('nex-134', '#111827', 'Negro', 0, 3),
+
+  ('nex-135', '#111827', 'Negro', 0, 1),
+  ('nex-135', '#1E293B', 'Azul noche', 0, 2),
+
+  ('nex-136', '#1E293B', 'Azul noche', 0, 1),
+  ('nex-136', '#1E3A8A', 'Azul marino', 0, 2),
+  ('nex-136', '#FF5A1F', 'Naranja NEXFIT', 0, 3),
+
+  ('nex-137', '#111827', 'Negro', 0, 1),
+  ('nex-137', '#FFFFFF', 'Blanco', 1, 2),
+  ('nex-137', '#1E3A8A', 'Azul marino', 0, 3),
+
+  ('nex-138', '#111827', 'Negro', 0, 1),
+  ('nex-138', '#1E3A8A', 'Azul marino', 0, 2),
+
+  ('nex-139', '#1E3A8A', 'Azul marino', 0, 1),
+  ('nex-139', '#FF5A1F', 'Naranja NEXFIT', 0, 2),
+  ('nex-139', '#111827', 'Negro', 0, 3),
+
+  ('nex-140', '#111827', 'Negro', 0, 1),
+  ('nex-140', '#FF5A1F', 'Naranja NEXFIT', 0, 2),
+
+  ('nex-141', '#FF5A1F', 'Naranja NEXFIT', 0, 1),
+  ('nex-141', '#FFFFFF', 'Blanco', 1, 2),
+  ('nex-141', '#1E293B', 'Azul noche', 0, 3),
+
+  ('nex-142', '#FF5A1F', 'Naranja NEXFIT', 0, 1),
+  ('nex-142', '#1E293B', 'Azul noche', 0, 2),
+  ('nex-142', '#111827', 'Negro', 0, 3),
+
+  ('nex-143', '#111827', 'Negro', 0, 1),
+  ('nex-143', '#1E293B', 'Azul noche', 0, 2),
+  ('nex-143', '#AE3200', 'Terracota', 0, 3),
+
+  ('nex-144', '#C4999B', 'Rosa palo', 0, 1),
+  ('nex-144', '#FF5A1F', 'Naranja NEXFIT', 0, 2),
+  ('nex-144', '#FFFFFF', 'Blanco', 1, 3),
+
+  ('nex-145', '#111827', 'Negro', 0, 1),
+  ('nex-145', '#E5E0D8', 'Arena', 1, 2),
+  ('nex-145', '#374151', 'Grafito', 0, 3),
+
+  ('nex-146', '#1E293B', 'Azul noche', 0, 1),
+  ('nex-146', '#FFFFFF', 'Blanco', 1, 2),
+  ('nex-146', '#4B5D3A', 'Verde oliva', 0, 3),
+
+  ('nex-147', '#E5E0D8', 'Arena', 1, 1),
+  ('nex-147', '#C4999B', 'Rosa palo', 0, 2),
+  ('nex-147', '#374151', 'Grafito', 0, 3),
+
+  ('nex-148', '#C4999B', 'Rosa palo', 0, 1),
+  ('nex-148', '#111827', 'Negro', 0, 2),
+  ('nex-148', '#E5E0D8', 'Arena', 1, 3);
+
+-- La valoración de partida de cada prenda (las reseñas se mezclan con ella).
+UPDATE products SET rating_base = rating;
+
 -- ============================================================================
 --  8. DATOS TRANSACCIONALES DE EJEMPLO (opcionales)
 --     Sirven para probar consultas y relaciones. Si no los quieres, borra
@@ -1629,7 +2453,6 @@ VALUES
 INSERT INTO order_items (order_id, product_id, product_name, size, color_hex, quantity, unit_price) VALUES
   (LAST_INSERT_ID(), 'nex-01', 'Camiseta Técnica Transpirable NEX-Pro', 'M', '#111827', 2, 34.95),
   (LAST_INSERT_ID(), 'nex-06', 'Top Deportivo Impact Control', 'S', '#AE3200', 1, 28.95);
-
 COMMIT;
 
 -- ============================================================================

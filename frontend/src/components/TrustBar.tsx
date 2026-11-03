@@ -6,7 +6,10 @@ export function TrustBar() {
     <>
       {/* Interactive Trust Bar */}
       <section className="w-full bg-slate-50 dark:bg-slate-900/60 border-y border-slate-200 dark:border-slate-800 py-10">
-        <div className="max-w-[1320px] mx-auto px-4 sm:px-6 md:px-8 flex flex-col md:flex-row items-center justify-between gap-6">
+        <div
+          className="max-w-[1320px] mx-auto px-4 sm:px-6 md:px-8 flex flex-col md:flex-row items-center justify-between gap-6"
+          data-reveal-stagger
+        >
           <div className="space-y-1 text-center md:text-left">
             <div className="inline-flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-wide">
               <span className="material-symbols-outlined text-[16px]" data-icon="verified">

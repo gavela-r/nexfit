@@ -1,7 +1,28 @@
 // CategoriesSection
 // Generado automáticamente desde code.html y adaptado a JSX + TypeScript.
+// El número de artículos de cada disciplina sale de GET /api/categories
+// (productos activos reales); mientras carga, o sin backend, no se muestra.
+import { useEffect, useState } from "react";
+import { getCategories } from "../api";
 
 export function CategoriesSection() {
+  const [counts, setCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void getCategories(controller.signal)
+      .then((list) => setCounts(Object.fromEntries(list.map((item) => [item.slug, item.items]))))
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, []);
+
+  /** «18 artículos» (o un hueco del mismo alto mientras no hay dato). */
+  const countLabel = (slug: string) => {
+    const total = counts[slug];
+    if (total === undefined) return " ";
+    return `${total} ${total === 1 ? "artículo" : "artículos"}`;
+  };
+
   return (
     <>
       {/* 3. MANTENER SECCIÓN DE CATEGORÍAS DEPORTIVAS: 6 DISCIPLINAS */}
@@ -9,7 +30,10 @@ export function CategoriesSection() {
         className="w-full max-w-[1320px] mx-auto px-4 sm:px-6 md:px-8 py-10 md:py-14"
         id="categorias"
       >
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+        <div
+          className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4"
+          data-reveal
+        >
           <div>
             <span className="text-xs font-bold text-primary uppercase tracking-wider">
               Explora por disciplina
@@ -20,7 +44,7 @@ export function CategoriesSection() {
           </div>
           <a
             className="text-secondary dark:text-blue-400 hover:text-primary font-semibold text-sm inline-flex items-center gap-1 group"
-            href="#catalogo"
+            href="#/catalogo"
           >
             <span className="">Ver todas las disciplinas</span>
             <span
@@ -31,11 +55,11 @@ export function CategoriesSection() {
             </span>
           </a>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4" data-reveal-stagger>
           {/* 1. Fitness / Gimnasio */}
           <a
             className="group relative rounded-2xl overflow-hidden aspect-[4/5] bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-end p-4 hover:shadow-lg transition-all"
-            href="#fitness"
+            href="#/fitness"
           >
             <div
               className="absolute inset-0 bg-cover bg-center group-hover:scale-110 transition-transform duration-500 ease-out opacity-85"
@@ -48,7 +72,7 @@ export function CategoriesSection() {
               <h3 className="font-bold text-sm md:text-base group-hover:text-primary transition-colors">
                 Fitness / Gimnasio
               </h3>
-              <p className="text-[11px] text-slate-300">142 artículos</p>
+              <p className="text-[11px] text-slate-300">{countLabel("fitness")}</p>
             </div>
           </a>
           {/* 2. Running */}
@@ -67,7 +91,7 @@ export function CategoriesSection() {
               <h3 className="font-bold text-sm md:text-base group-hover:text-primary transition-colors">
                 Running
               </h3>
-              <p className="text-[11px] text-slate-300">89 artículos</p>
+              <p className="text-[11px] text-slate-300">{countLabel("running")}</p>
             </div>
           </a>
           {/* 3. Athleisure / Casual */}
@@ -86,7 +110,7 @@ export function CategoriesSection() {
               <h3 className="font-bold text-sm md:text-base group-hover:text-primary transition-colors">
                 Athleisure / Casual
               </h3>
-              <p className="text-[11px] text-slate-300">115 artículos</p>
+              <p className="text-[11px] text-slate-300">{countLabel("athleisure")}</p>
             </div>
           </a>
           {/* 4. Fútbol */}
@@ -105,13 +129,13 @@ export function CategoriesSection() {
               <h3 className="font-bold text-sm md:text-base group-hover:text-primary transition-colors">
                 Fútbol
               </h3>
-              <p className="text-[11px] text-slate-300">64 artículos</p>
+              <p className="text-[11px] text-slate-300">{countLabel("futbol")}</p>
             </div>
           </a>
           {/* 5. CrossFit / Entrenamiento */}
           <a
             className="group relative rounded-2xl overflow-hidden aspect-[4/5] bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-end p-4 hover:shadow-lg transition-all"
-            href="#crossfit"
+            href="#/crossfit"
           >
             <div
               className="absolute inset-0 bg-cover bg-center group-hover:scale-110 transition-transform duration-500 ease-out opacity-85"
@@ -124,13 +148,13 @@ export function CategoriesSection() {
               <h3 className="font-bold text-sm md:text-base group-hover:text-primary transition-colors">
                 CrossFit / Entreno
               </h3>
-              <p className="text-[11px] text-slate-300">78 artículos</p>
+              <p className="text-[11px] text-slate-300">{countLabel("crossfit")}</p>
             </div>
           </a>
           {/* 6. Outdoor */}
           <a
             className="group relative rounded-2xl overflow-hidden aspect-[4/5] bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-end p-4 hover:shadow-lg transition-all"
-            href="#outdoor"
+            href="#/outdoor"
           >
             <div
               className="absolute inset-0 bg-cover bg-center group-hover:scale-110 transition-transform duration-500 ease-out opacity-85"
@@ -143,7 +167,7 @@ export function CategoriesSection() {
               <h3 className="font-bold text-sm md:text-base group-hover:text-primary transition-colors">
                 Outdoor
               </h3>
-              <p className="text-[11px] text-slate-300">93 artículos</p>
+              <p className="text-[11px] text-slate-300">{countLabel("outdoor")}</p>
             </div>
           </a>
         </div>
