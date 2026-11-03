@@ -25,6 +25,8 @@ export interface CartItemView extends CartItemInput {
   category?: string;
   /** Nombre comercial del color. */
   colorName?: string;
+  /** Unidades disponibles de esa talla (la cesta avisa si no llegan). */
+  stock?: number;
 }
 
 export interface CartView {

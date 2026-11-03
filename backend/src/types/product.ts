@@ -33,6 +33,8 @@ export interface Product {
   garmentType?: string;
   /** Propiedades técnicas: compresion, ripstop, dwr, antiabrasion. */
   features: string[];
+  /** Tallas agotadas (stock 0): las tarjetas no dejan elegirlas. */
+  soldOutSizes: string[];
   subtitle?: string;
   description?: string;
 }

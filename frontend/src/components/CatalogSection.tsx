@@ -35,7 +35,7 @@ function applyFilter(items: Product[], filter: Filter): Product[] {
 }
 
 interface CatalogSectionProps {
-  onAddToCart: (item: CartItemInput) => void;
+  onAddToCart: (item: CartItemInput) => Promise<boolean> | void;
   /** IDs de los productos favoritos del usuario. */
   favoriteIds: string[];
   onToggleFavorite: (productId: string) => void;

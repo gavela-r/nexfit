@@ -68,7 +68,7 @@ function toggle(list: string[], value: string): string[] {
 
 interface CollectionCatalogPageProps {
   config: CatalogConfig;
-  onAddToCart: (item: CartItemInput) => void;
+  onAddToCart: (item: CartItemInput) => Promise<boolean> | void;
   favoriteIds: string[];
   onToggleFavorite: (productId: string) => void;
 }

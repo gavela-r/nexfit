@@ -214,6 +214,45 @@ export async function createCheckout(
   const total = round2(subtotal - discount + shippingCost);
 
   const { orderId, orderNumber } = await inTransaction(async (conn) => {
+    // Stock: el de cada talla (sumando colores) tiene que cubrir la cesta.
+    // FOR UPDATE bloquea esas filas mientras se crea el pedido.
+    const needed = new Map<
+      string,
+      { productId: string; name: string; size: string; quantity: number }
+    >();
+    for (const item of cart.items) {
+      const key = `${item.productId}|${item.size}`;
+      const entry = needed.get(key);
+      if (entry) entry.quantity += item.quantity;
+      else
+        needed.set(key, {
+          productId: item.productId,
+          name: item.name ?? item.productId,
+          size: item.size,
+          quantity: item.quantity,
+        });
+    }
+    const problems: string[] = [];
+    for (const line of needed.values()) {
+      const [found] = await conn.query<RowDataPacket[]>(
+        "SELECT stock FROM product_sizes WHERE product_id = ? AND size = ? FOR UPDATE",
+        [line.productId, line.size],
+      );
+      const stock = Number(found[0]?.stock ?? 0);
+      if (stock === 0) problems.push(`${line.name} (talla ${line.size}) está agotada`);
+      else if (line.quantity > stock) {
+        problems.push(
+          `${line.name} (talla ${line.size}): solo quedan ${stock} y tienes ${line.quantity} en la cesta`,
+        );
+      }
+    }
+    if (problems.length > 0) {
+      throw ApiError.conflict(
+        "Algunas prendas de tu cesta ya no tienen stock suficiente",
+        problems,
+      );
+    }
+
     // Los intentos anteriores que nunca se pagaron dejan de estar vigentes.
     await conn.query(
       "UPDATE orders SET status = 'cancelado' WHERE user_id = ? AND status = 'pendiente'",

@@ -18,7 +18,7 @@ interface RecentlyViewedPageProps {
   restoring: boolean;
   favoriteIds: string[];
   onToggleFavorite: (productId: string) => void;
-  onAddToCart: (item: CartItemInput) => void;
+  onAddToCart: (item: CartItemInput) => Promise<boolean> | void;
   onOpenLogin: () => void;
 }
 

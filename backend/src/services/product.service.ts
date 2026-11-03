@@ -80,7 +80,23 @@ async function loadColors(): Promise<Map<string, ProductColor[]>> {
   return byProduct;
 }
 
-function toProduct(row: CatalogRow, colors: Map<string, ProductColor[]>): Product {
+/** Tallas sin unidades (stock = 0) de cada producto. */
+async function loadSoldOut(): Promise<Map<string, string[]>> {
+  const list = await rows<RowDataPacket & { product_id: string; size: string }>(
+    "SELECT product_id, size FROM product_sizes WHERE stock = 0 ORDER BY product_id, sort_order",
+  );
+  const byProduct = new Map<string, string[]>();
+  for (const row of list) {
+    byProduct.set(row.product_id, [...(byProduct.get(row.product_id) ?? []), row.size]);
+  }
+  return byProduct;
+}
+
+function toProduct(
+  row: CatalogRow,
+  colors: Map<string, ProductColor[]>,
+  soldOut: Map<string, string[]> = new Map(),
+): Product {
   const tone = row.badge_tone ?? "";
   return {
     id: row.id,
@@ -97,6 +113,7 @@ function toProduct(row: CatalogRow, colors: Map<string, ProductColor[]>): Produc
     sizes: (row.sizes ?? "").split(",").filter(Boolean),
     defaultSize: row.default_size,
     colors: colors.get(row.id) ?? [],
+    soldOutSizes: soldOut.get(row.id) ?? [],
     price: Number(row.price),
     ...(row.original_price !== null ? { originalPrice: Number(row.original_price) } : {}),
     audience: row.audience,
@@ -152,12 +169,13 @@ export async function listProducts(
         ? " ORDER BY v.price DESC, v.name ASC"
         : " ORDER BY v.rating DESC, v.name ASC";
 
-  const [catalog, colors] = await Promise.all([
+  const [catalog, colors, soldOut] = await Promise.all([
     rows<CatalogRow>(`${CATALOG_SELECT}${where}${order}`, params),
     loadColors(),
+    loadSoldOut(),
   ]);
 
-  return catalog.map((row) => toProduct(row, colors));
+  return catalog.map((row) => toProduct(row, colors, soldOut));
 }
 
 export async function getProduct(id: string, userId?: string): Promise<Product> {
@@ -170,8 +188,8 @@ export async function getProduct(id: string, userId?: string): Promise<Product> 
     throw ApiError.notFound(`No existe el producto "${id}"`);
   }
 
-  const colors = await loadColors();
-  return toProduct(row, colors);
+  const [colors, soldOut] = await Promise.all([loadColors(), loadSoldOut()]);
+  return toProduct(row, colors, soldOut);
 }
 
 export interface ProductPage {
@@ -188,7 +206,7 @@ export interface ProductPage {
 export async function getProductPage(id: string, userId?: string): Promise<ProductPage> {
   const product = await getProduct(id, userId);
 
-  const [colors, sizes, relatedRows, allColors] = await Promise.all([
+  const [colors, sizes, relatedRows, allColors, soldOut] = await Promise.all([
     rows<RowDataPacket & { color_hex: string; color_name: string; has_border: number }>(
       `SELECT color_hex, color_name, has_border FROM product_colors
         WHERE product_id = ? ORDER BY sort_order, color_hex`,
@@ -204,6 +222,7 @@ export async function getProductPage(id: string, userId?: string): Promise<Produ
       [userId ?? null, product.categorySlug ?? "", id, product.audience ?? "unisex"],
     ),
     loadColors(),
+    loadSoldOut(),
   ]);
 
   return {
@@ -214,7 +233,7 @@ export async function getProductPage(id: string, userId?: string): Promise<Produ
       hasBorder: Number(color.has_border) === 1,
     })),
     sizes: sizes.map((row) => ({ size: row.size, stock: Number(row.stock) })),
-    related: relatedRows.map((row) => toProduct(row, allColors)),
+    related: relatedRows.map((row) => toProduct(row, allColors, soldOut)),
   };
 }
 

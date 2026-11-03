@@ -46,6 +46,7 @@ interface CartLineRow extends RowDataPacket {
   image_url: string;
   category_label: string | null;
   color_name: string | null;
+  stock: number | null;
 }
 
 const EMPTY_CART: CartView = { items: [], count: 0, total: 0, cartToken: null };
@@ -104,10 +105,11 @@ async function readCart(cart: CartRef | null): Promise<CartView> {
   const lines = await rows<CartLineRow>(
     `SELECT ci.product_id, ci.size, ci.color_hex, ci.quantity, ci.unit_price,
             p.name AS product_name, p.image_url,
-            c.label AS category_label, pc.color_name
+            c.label AS category_label, pc.color_name, ps.stock
        FROM cart_items ci
        JOIN products p ON p.id = ci.product_id
        LEFT JOIN categories c ON c.id = p.category_id
+       LEFT JOIN product_sizes ps ON ps.product_id = ci.product_id AND ps.size = ci.size
        LEFT JOIN product_colors pc
               ON pc.product_id = ci.product_id AND pc.color_hex = ci.color_hex
       WHERE ci.cart_id = ?
@@ -125,6 +127,7 @@ async function readCart(cart: CartRef | null): Promise<CartView> {
     image: line.image_url,
     ...(line.category_label ? { category: line.category_label } : {}),
     ...(line.color_name ? { colorName: line.color_name } : {}),
+    stock: Number(line.stock ?? 0),
   }));
 
   const count = items.reduce((total, item) => total + item.quantity, 0);
@@ -137,6 +140,43 @@ async function readCart(cart: CartRef | null): Promise<CartView> {
 export async function getCart(identity: CartIdentity): Promise<CartView> {
   const cart = await resolveCart(identity, true);
   return readCart(cart);
+}
+
+/**
+ * Comprueba que hay unidades para dejar `wanted` en la línea de esa talla y
+ * color. El stock es por talla, así que también cuentan las otras líneas de la
+ * misma talla en otro color. 400 con un mensaje claro si no llega.
+ */
+async function assertStock(
+  cartId: number,
+  line: { productId: string; productName: string; size: string; color: string },
+  wanted: number,
+  /** Unidades que ya tiene esta misma línea (para explicar mejor el rechazo). */
+  alreadyInLine = 0,
+): Promise<void> {
+  const [size] = await rows<RowDataPacket & { stock: number }>(
+    "SELECT stock FROM product_sizes WHERE product_id = ? AND size = ? LIMIT 1",
+    [line.productId, line.size],
+  );
+  const stock = Number(size?.stock ?? 0);
+
+  const [others] = await rows<RowDataPacket & { total: number | null }>(
+    `SELECT SUM(quantity) AS total FROM cart_items
+      WHERE cart_id = ? AND product_id = ? AND size = ? AND color_hex <> ?`,
+    [cartId, line.productId, line.size, line.color],
+  );
+  const left = stock - Number(others?.total ?? 0);
+
+  if (stock === 0) {
+    throw ApiError.badRequest(`La talla ${line.size} de ${line.productName} está agotada`);
+  }
+  if (wanted > left) {
+    throw ApiError.badRequest(
+      left <= 0 || alreadyInLine >= left
+        ? `Ya tienes en la cesta todas las unidades disponibles de ${line.productName} en talla ${line.size}`
+        : `Solo quedan ${left} ${left === 1 ? "unidad" : "unidades"} de ${line.productName} en talla ${line.size}`,
+    );
+  }
 }
 
 /** Añade una línea (o suma cantidad si ya existía la misma talla y color). */
@@ -187,6 +227,18 @@ export async function addLine(identity: CartIdentity, input: CartLineInput): Pro
 
   const cart = await resolveCart(identity, true);
   if (!cart) throw ApiError.badRequest("No se pudo crear el carrito");
+
+  // Lo que ya había de esta misma línea más lo que se añade.
+  const [current] = await rows<RowDataPacket & { quantity: number }>(
+    "SELECT quantity FROM cart_items WHERE cart_id = ? AND product_id = ? AND size = ? AND color_hex = ?",
+    [cart.id, input.productId, input.size, color],
+  );
+  await assertStock(
+    cart.id,
+    { productId: input.productId, productName: product.name, size: input.size, color },
+    Number(current?.quantity ?? 0) + input.quantity,
+    Number(current?.quantity ?? 0),
+  );
 
   await run(
     `INSERT INTO cart_items (cart_id, product_id, size, color_hex, quantity, unit_price)
@@ -243,6 +295,20 @@ export async function updateLine(
   const cart = await resolveCart(identity, false);
   if (!cart) {
     throw ApiError.notFound(`El producto "${productId}" no está en el carrito`);
+  }
+
+  // Bajar unidades siempre se puede; subir, solo si hay stock.
+  const [line] = await rows<RowDataPacket & { quantity: number; name: string }>(
+    `SELECT ci.quantity, p.name FROM cart_items ci JOIN products p ON p.id = ci.product_id
+      WHERE ci.cart_id = ? AND ci.product_id = ? AND ci.size = ? AND ci.color_hex = ?`,
+    [cart.id, productId, input.size, input.color],
+  );
+  if (line && input.quantity > Number(line.quantity)) {
+    await assertStock(
+      cart.id,
+      { productId, productName: line.name, size: input.size, color: input.color },
+      input.quantity,
+    );
   }
 
   const result = await run(

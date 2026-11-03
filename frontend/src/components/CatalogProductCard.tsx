@@ -6,7 +6,7 @@ import type { CartItemInput } from "../api";
 import type { Product } from "../data/products";
 import { formatPrice } from "../utils/format";
 import { recordView } from "../utils/recentlyViewed";
-import { preferredSizeFor, useUserSizes } from "../utils/sizes";
+import { pickAvailableSize, preferredSizeFor, soldOutSizes, useUserSizes } from "../utils/sizes";
 
 const SIZE_IDLE =
   "border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-900 dark:hover:border-slate-400";
@@ -15,7 +15,7 @@ const SIZE_ACTIVE =
 
 interface CatalogProductCardProps {
   product: Product;
-  onAddToCart: (item: CartItemInput) => void;
+  onAddToCart: (item: CartItemInput) => Promise<boolean> | void;
   favorited: boolean;
   onToggleFavorite: (productId: string) => void;
   /** Talla elegida en los filtros: se preselecciona si el producto la tiene. */
@@ -33,11 +33,15 @@ export function CatalogProductCard({
   preferredColors,
 }: CatalogProductCardProps) {
   // Prioridad: talla del filtro del catálogo > talla habitual del usuario > la de la prenda.
-  const userSize = preferredSizeFor(product, useUserSizes());
-  const initialSize =
-    preferredSize && product.sizes.includes(preferredSize)
-      ? preferredSize
-      : (userSize ?? product.defaultSize);
+  // Prioridad: talla del filtro > talla habitual del usuario > la de la prenda,
+  // saltando siempre las tallas agotadas.
+  const soldOut = soldOutSizes(product);
+  const allSoldOut = product.sizes.every((option) => soldOut.has(option));
+  const initialSize = pickAvailableSize(product, [
+    preferredSize,
+    preferredSizeFor(product, useUserSizes()),
+    product.defaultSize,
+  ]);
   const [size, setSize] = useState(initialSize);
   // Si el usuario entra (o cambia sus tallas) con la tarjeta ya pintada, se
   // actualiza mientras no haya elegido otra talla a mano.
@@ -52,11 +56,18 @@ export function CatalogProductCard({
       ? Math.round((1 - product.price / product.originalPrice) * 100)
       : null;
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     const color =
       product.colors.find((option) => preferredColors.includes(option.value.toUpperCase())) ??
       product.colors[0];
-    onAddToCart({ productId: product.id, size, color: color?.value ?? "", quantity: 1 });
+    // Solo se marca «¡Añadido!» si la cesta lo ha aceptado (puede faltar stock).
+    const accepted = await onAddToCart({
+      productId: product.id,
+      size,
+      color: color?.value ?? "",
+      quantity: 1,
+    });
+    if (accepted === false) return;
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1500);
   };
@@ -132,15 +143,17 @@ export function CatalogProductCard({
               <button
                 key={option}
                 type="button"
-                aria-label={`Talla ${option}`}
+                aria-label={soldOut.has(option) ? `Talla ${option} (agotada)` : `Talla ${option}`}
                 aria-pressed={option === size}
+                disabled={soldOut.has(option)}
+                title={soldOut.has(option) ? "Agotada" : undefined}
                 onClick={() => {
                   chosenByHand.current = true;
                   setSize(option);
                 }}
                 className={`min-w-8 h-8 px-2 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
                   option === size ? SIZE_ACTIVE : SIZE_IDLE
-                }`}
+                } ${soldOut.has(option) ? "line-through opacity-40 cursor-not-allowed" : ""}`}
               >
                 {option}
               </button>
@@ -171,15 +184,16 @@ export function CatalogProductCard({
           </div>
           <button
             type="button"
-            onClick={handleAdd}
-            className={`h-10 px-4 rounded-xl text-white font-bold text-xs inline-flex items-center gap-2 shadow-sm transition-all active:scale-95 cursor-pointer ${
+            onClick={() => void handleAdd()}
+            disabled={allSoldOut || soldOut.has(size)}
+            className={`h-10 px-4 rounded-xl text-white font-bold text-xs inline-flex items-center gap-2 shadow-sm transition-all active:scale-95 cursor-pointer disabled:cursor-not-allowed disabled:bg-slate-400 disabled:active:scale-100 dark:disabled:bg-slate-600 ${
               added ? "add-bounce bg-emerald-600" : "bg-primary hover:bg-[#E04B16]"
             }`}
           >
             <span className="material-symbols-outlined text-[18px]">
-              {added ? "check" : "add_shopping_cart"}
+              {allSoldOut ? "block" : added ? "check" : "add_shopping_cart"}
             </span>
-            <span>{added ? "¡Añadido!" : "Añadir"}</span>
+            <span>{allSoldOut ? "Agotado" : added ? "¡Añadido!" : "Añadir"}</span>
           </button>
         </div>
       </div>

@@ -36,3 +36,27 @@ export function preferredSizeFor(product: Product, sizes: UserSizes | null): str
 
   return wanted && product.sizes.includes(wanted) ? wanted : null;
 }
+
+/** Tallas agotadas del producto (las manda el backend; el catálogo local no las tiene). */
+export function soldOutSizes(product: Product): Set<string> {
+  return new Set(product.soldOutSizes ?? []);
+}
+
+/**
+ * Primera talla con stock de la lista de preferencias (filtro del catálogo,
+ * talla habitual, talla por defecto...). Si ninguna vale, la primera que
+ * quede; si no queda ninguna, la talla por defecto (la prenda está agotada).
+ */
+export function pickAvailableSize(
+  product: Product,
+  preferences: (string | null | undefined)[],
+): string {
+  const soldOut = soldOutSizes(product);
+  const usable = (size: string | null | undefined): size is string =>
+    !!size && product.sizes.includes(size) && !soldOut.has(size);
+  return (
+    preferences.find(usable) ??
+    product.sizes.find((size) => !soldOut.has(size)) ??
+    product.defaultSize
+  );
+}

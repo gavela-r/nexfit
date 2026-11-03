@@ -5,7 +5,7 @@ import type { Product } from "../data/products";
 import type { CartItemInput } from "../api";
 import { formatPrice } from "../utils/format";
 import { recordView } from "../utils/recentlyViewed";
-import { preferredSizeFor, useUserSizes } from "../utils/sizes";
+import { pickAvailableSize, preferredSizeFor, soldOutSizes, useUserSizes } from "../utils/sizes";
 
 const SIZE_IDLE =
   "border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold hover:border-primary";
@@ -17,7 +17,7 @@ const ADD_BUTTON =
 
 interface ProductCardProps {
   product: Product;
-  onAddToCart: (item: CartItemInput) => void;
+  onAddToCart: (item: CartItemInput) => Promise<boolean> | void;
   /** Si el producto está en favoritos (tabla `favorites`). */
   favorited: boolean;
   onToggleFavorite: (productId: string) => void;
@@ -30,7 +30,13 @@ export function ProductCard({
   onToggleFavorite,
 }: ProductCardProps) {
   // La talla habitual del usuario (si la prenda la tiene) o la de la prenda.
-  const initialSize = preferredSizeFor(product, useUserSizes()) ?? product.defaultSize;
+  // La talla habitual del usuario o la de la prenda, saltando las agotadas.
+  const soldOut = soldOutSizes(product);
+  const allSoldOut = product.sizes.every((option) => soldOut.has(option));
+  const initialSize = pickAvailableSize(product, [
+    preferredSizeFor(product, useUserSizes()),
+    product.defaultSize,
+  ]);
   const [size, setSize] = useState(initialSize);
   const chosenByHand = useRef(false);
   useEffect(() => {
@@ -39,14 +45,16 @@ export function ProductCard({
   const [colorIndex, setColorIndex] = useState(0);
   const [added, setAdded] = useState(false);
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     const color = product.colors[colorIndex];
-    onAddToCart({
+    // Solo se marca «¡Añadido!» si la cesta lo ha aceptado (puede faltar stock).
+    const accepted = await onAddToCart({
       productId: product.id,
       size,
       color: color?.value ?? "",
       quantity: 1,
     });
+    if (accepted === false) return;
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1500);
   };
@@ -125,15 +133,17 @@ export function ProductCard({
                 <button
                   key={option}
                   type="button"
-                  aria-label={`Talla ${option}`}
+                  aria-label={soldOut.has(option) ? `Talla ${option} (agotada)` : `Talla ${option}`}
                   aria-pressed={option === size}
+                  disabled={soldOut.has(option)}
+                  title={soldOut.has(option) ? "Agotada" : undefined}
                   onClick={() => {
                     chosenByHand.current = true;
                     setSize(option);
                   }}
                   className={`w-8 h-8 rounded-lg text-xs cursor-pointer ${
                     option === size ? SIZE_ACTIVE : SIZE_IDLE
-                  }`}
+                  } ${soldOut.has(option) ? "line-through opacity-40 cursor-not-allowed" : ""}`}
                 >
                   {option}
                 </button>
@@ -185,17 +195,18 @@ export function ProductCard({
         </div>
         <button
           type="button"
-          onClick={handleAdd}
-          className={`${ADD_BUTTON} ${
+          onClick={() => void handleAdd()}
+          disabled={allSoldOut || soldOut.has(size)}
+          className={`${ADD_BUTTON} disabled:cursor-not-allowed disabled:bg-slate-400 dark:disabled:bg-slate-600 ${
             added
               ? "add-bounce bg-emerald-600"
               : "bg-slate-900 hover:bg-primary dark:bg-primary dark:hover:bg-[#E04B16]"
           }`}
         >
           <span className="material-symbols-outlined text-[18px]">
-            {added ? "check" : "add_shopping_cart"}
+            {allSoldOut ? "block" : added ? "check" : "add_shopping_cart"}
           </span>
-          <span>{added ? "¡Añadido!" : "Añadir"}</span>
+          <span>{allSoldOut ? "Agotado" : added ? "¡Añadido!" : "Añadir"}</span>
         </button>
       </div>
     </article>

@@ -27,7 +27,7 @@ interface ProductPageProps {
   token: string | null;
   favoriteIds: string[];
   onToggleFavorite: (productId: string) => void;
-  onAddToCart: (item: CartItemInput) => void;
+  onAddToCart: (item: CartItemInput) => Promise<boolean> | void;
   onOpenCart: () => void;
   onOpenLogin: () => void;
 }
@@ -217,9 +217,10 @@ export function ProductPage({
     });
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (stock === 0) return;
-    onAddToCart({ productId: product.id, size, color, quantity });
+    const accepted = await onAddToCart({ productId: product.id, size, color, quantity });
+    if (accepted === false) return;
     setAdded(true);
     window.setTimeout(() => setAdded(false), 2500);
   };
@@ -486,7 +487,7 @@ export function ProductPage({
                     : "bg-primary shadow-primary/25 hover:bg-[#F04A10]"
                 }`}
                 disabled={stock === 0}
-                onClick={handleAdd}
+                onClick={() => void handleAdd()}
                 type="button"
               >
                 <span className="material-symbols-outlined text-[20px]">

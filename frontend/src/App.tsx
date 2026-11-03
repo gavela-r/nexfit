@@ -171,15 +171,29 @@ export default function App() {
   }, [cartOpen, loadCart]);
 
   // Alta optimista: la UI responde al instante y el backend manda después.
-  const handleAddToCart = (item: CartItemInput) => {
+  // Si el backend la rechaza (p. ej. sin stock) se deshace y se explica el motivo.
+  // Devuelve si se añadió, para que el botón solo diga «¡Añadido!» cuando es verdad.
+  const handleAddToCart = async (item: CartItemInput): Promise<boolean> => {
     setCartCount((current) => current + item.quantity);
-    void addCartItem(item, token ?? undefined)
-      .then((data) => {
-        setCart(data);
-        setCartCount(data.count);
-        setCartError(null);
-      })
-      .catch(() => setCartCount((current) => Math.max(0, current - item.quantity)));
+    try {
+      const data = await addCartItem(item, token ?? undefined);
+      setCart(data);
+      setCartCount(data.count);
+      setCartError(null);
+      return true;
+    } catch (error) {
+      setCartCount((current) => Math.max(0, current - item.quantity));
+      setToast({
+        id: Date.now(),
+        title: "No se pudo añadir a la cesta",
+        tone: "error",
+        message:
+          error instanceof ApiRequestError
+            ? error.message
+            : "Comprueba tu conexión e inténtalo de nuevo.",
+      });
+      return false;
+    }
   };
 
   // Cambiar la cantidad de una línea (el backend la persiste al momento).
@@ -200,7 +214,13 @@ export default function App() {
         setCart(data);
         setCartCount(data.count);
       })
-      .catch(() => setCartError("No se pudo actualizar la cantidad. Inténtalo de nuevo."))
+      .catch((error: unknown) =>
+        setCartError(
+          error instanceof ApiRequestError
+            ? error.message
+            : "No se pudo actualizar la cantidad. Inténtalo de nuevo.",
+        ),
+      )
       .finally(() => setBusyLine(null));
   };
 
@@ -285,9 +305,10 @@ export default function App() {
       setToast({
         id: Date.now(),
         title: "No se pudo iniciar el pago",
+        tone: "error",
         message:
           error instanceof ApiRequestError
-            ? error.message
+            ? [error.message, ...error.details].join(". ")
             : "Comprueba tu conexión e inténtalo de nuevo.",
       });
     }

@@ -32,6 +32,8 @@ export interface Product {
    * oversize, bolsillos_zip, antipilling (athleisure).
    */
   features?: string[];
+  /** Tallas agotadas (stock 0), según el backend. */
+  soldOutSizes?: string[];
   /** Línea superior de la tarjeta: «Running · Clima Adverso». */
   subtitle?: string;
   description?: string;

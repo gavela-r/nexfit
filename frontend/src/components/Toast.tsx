@@ -8,6 +8,8 @@ export interface ToastData {
   id: number;
   title: string;
   message: string;
+  /** «error» pinta el aviso en rojo con su icono (por defecto, éxito en verde). */
+  tone?: "success" | "error";
 }
 
 interface ToastProps {
@@ -34,13 +36,19 @@ export function Toast({ toast, onClose, duration = 4500 }: ToastProps) {
     >
       <div
         key={toast.id}
-        role="status"
-        aria-live="polite"
+        role={toast.tone === "error" ? "alert" : "status"}
+        aria-live={toast.tone === "error" ? "assertive" : "polite"}
         className="toast-enter pointer-events-auto relative flex items-start gap-3 overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 pr-11 shadow-2xl shadow-slate-900/20 dark:border-slate-700 dark:bg-slate-900"
       >
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400">
-          <span className="material-symbols-outlined text-[22px]">check_circle</span>
-        </span>
+        {toast.tone === "error" ? (
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400">
+            <span className="material-symbols-outlined text-[22px]">error</span>
+          </span>
+        ) : (
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400">
+            <span className="material-symbols-outlined text-[22px]">check_circle</span>
+          </span>
+        )}
 
         <div className="min-w-0">
           <p className="text-sm font-extrabold tracking-tight text-slate-900 dark:text-white">

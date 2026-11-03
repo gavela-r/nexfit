@@ -39,7 +39,7 @@ interface CartDrawerProps {
   onQuantityChange: (item: CartItemView, quantity: number) => void;
   onRemove: (item: CartItemView) => void;
   onToggleFavorite: (productId: string) => void;
-  onAddUpsell: (item: CartItemInput) => void;
+  onAddUpsell: (item: CartItemInput) => Promise<boolean> | void;
   onCheckout: () => void;
   /** Creando la sesión de pago de Stripe (bloquea el botón). */
   checkoutLoading?: boolean;
@@ -109,6 +109,25 @@ export function CartDrawer({
   if (!open) return null;
 
   const items = cart?.items ?? [];
+
+  // Stock: es por talla, así que se suman las líneas de la misma talla en otros colores.
+  const sizeKey = (item: CartItemView) => `${item.productId}|${item.size}`;
+  const unitsPerSize = new Map<string, number>();
+  for (const item of items) {
+    unitsPerSize.set(sizeKey(item), (unitsPerSize.get(sizeKey(item)) ?? 0) + item.quantity);
+  }
+  /** Aviso de la línea si la cesta pide más de lo que queda (null si está bien). */
+  const stockProblem = (item: CartItemView): string | null => {
+    if (item.stock === undefined) return null;
+    if (item.stock === 0) return "Talla agotada: quítala para tramitar el pedido";
+    if ((unitsPerSize.get(sizeKey(item)) ?? 0) > item.stock) {
+      return item.stock === 1
+        ? "Solo queda 1 en esta talla: reduce la cantidad"
+        : `Solo quedan ${item.stock} en esta talla: reduce la cantidad`;
+    }
+    return null;
+  };
+  const stockIssues = items.filter((item) => stockProblem(item) !== null).length;
   const count = cart?.count ?? 0;
   const subtotal = cart?.total ?? 0;
 
@@ -321,6 +340,16 @@ export function CartDrawer({
                           </span>
                         </p>
 
+                        {stockProblem(item) && (
+                          <p
+                            className="mt-1.5 flex items-center gap-1 text-[10.5px] font-bold text-red-600 dark:text-red-400"
+                            role="alert"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">error</span>
+                            {stockProblem(item)}
+                          </p>
+                        )}
+
                         <div className="mt-2.5 flex items-center justify-between">
                           <div className="flex h-8 items-center overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
                             <button
@@ -338,7 +367,18 @@ export function CartDrawer({
                             <button
                               aria-label={`Añadir una unidad de ${item.name ?? "este producto"}`}
                               className="flex h-full w-8 items-center justify-center text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-800"
-                              disabled={busy || item.quantity >= 99}
+                              disabled={
+                                busy ||
+                                item.quantity >= 99 ||
+                                (item.stock !== undefined &&
+                                  (unitsPerSize.get(sizeKey(item)) ?? 0) >= item.stock)
+                              }
+                              title={
+                                item.stock !== undefined &&
+                                (unitsPerSize.get(sizeKey(item)) ?? 0) >= item.stock
+                                  ? "No quedan más unidades en esta talla"
+                                  : undefined
+                              }
                               onClick={() => onQuantityChange(item, item.quantity + 1)}
                               type="button"
                             >
@@ -592,11 +632,29 @@ export function CartDrawer({
               </p>
             )}
 
+            {stockIssues > 0 && (
+              <p
+                className="mt-3 flex items-start gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-[10.5px] leading-snug text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300"
+                id="cart-stock-problem"
+              >
+                <span className="material-symbols-outlined mt-px text-[14px]">inventory_2</span>
+                {stockIssues === 1
+                  ? "Una prenda de tu cesta no tiene stock suficiente. Ajústala para poder tramitar el pedido."
+                  : `${stockIssues} prendas de tu cesta no tienen stock suficiente. Ajústalas para poder tramitar el pedido.`}
+              </p>
+            )}
+
             <button
-              aria-describedby={!isAuthenticated ? "cart-auth-required" : undefined}
+              aria-describedby={
+                stockIssues > 0
+                  ? "cart-stock-problem"
+                  : !isAuthenticated
+                    ? "cart-auth-required"
+                    : undefined
+              }
               aria-busy={checkoutLoading}
-              className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-bold text-white shadow-lg shadow-primary/25 transition-all hover:-translate-y-px hover:bg-[#F04A10] hover:shadow-xl hover:shadow-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:cursor-wait disabled:opacity-80 disabled:hover:translate-y-0"
-              disabled={checkoutLoading}
+              className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-bold text-white shadow-lg shadow-primary/25 transition-all hover:-translate-y-px hover:bg-[#F04A10] hover:shadow-xl hover:shadow-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 aria-busy:cursor-wait"
+              disabled={checkoutLoading || stockIssues > 0}
               onClick={onCheckout}
               type="button"
             >
